@@ -1,0 +1,20 @@
+\begin{table}
+\caption{Holdout comparison of security screening models.}
+\label{tab:model_comparison}
+\begin{tabular}{llrrrrrrr}
+\toprule
+stage & model & recall & precision & fnr & pf_calls_saved_fraction & missed_violations & auprc & auroc \\
+\midrule
+Week 5 ML baseline & GradientBoosting & 1.000 & 1.000 & 0.000 & 0.400 & 0 & 1.000 & 1.000 \\
+Week 6 PI-MLP & PI-MLP full & 1.000 & 1.000 & 0.000 & 0.400 & 0 & 1.000 & 1.000 \\
+Week 7 GNN & FlattenedMLP & 1.000 & 1.000 & 0.000 & 0.400 & 0 & 1.000 & 1.000 \\
+Week 5 ML baseline & EngineeringRule & 1.000 & 0.857 & 0.000 & 0.300 & 0 & 0.910 & 0.906 \\
+Week 6 PI-MLP & BaselineMLP & 1.000 & 0.857 & 0.000 & 0.300 & 0 & 1.000 & 1.000 \\
+Week 5 ML baseline & AllUnsafe & 1.000 & 0.600 & 0.000 & 0.000 & 0 & 0.600 & 0.500 \\
+Week 5 ML baseline & MLP & 1.000 & 0.600 & 0.000 & 0.000 & 0 & 0.533 & 0.240 \\
+Week 5 ML baseline & LogisticRegression & 0.833 & 1.000 & 0.167 & 0.500 & 2 & 1.000 & 1.000 \\
+Week 5 ML baseline & RandomForest & 0.833 & 0.909 & 0.167 & 0.450 & 2 & 0.956 & 0.938 \\
+Week 7 GNN & PhaseAwareGNN & 0.583 & 0.875 & 0.417 & 0.600 & 5 & 0.913 & 0.875 \\
+\bottomrule
+\end{tabular}
+\end{table}

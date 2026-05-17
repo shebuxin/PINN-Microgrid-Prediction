@@ -1,0 +1,17 @@
+global_feature
+load_scale
+phase_a_factor
+phase_b_factor
+phase_c_factor
+pv_scale
+bess_p_discharge_mw
+base_min_vm_pu
+base_max_vm_pu
+base_max_line_loading_frac
+base_max_vuf_frac
+base_p_grid_mw
+ctype_line_outage
+ctype_pv_trip
+ctype_bess_trip
+ctype_pcc_outage
+contingency_element_norm

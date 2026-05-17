@@ -1,0 +1,8 @@
+violation_type,count
+voltage_low_violation,5
+voltage_high_violation,0
+loading_violation,5
+vuf_violation,0
+non_convergence_violation,7
+service_loss_violation,42
+critical_service_loss_violation,28

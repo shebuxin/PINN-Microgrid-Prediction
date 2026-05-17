@@ -1,0 +1,7 @@
+claim_id,claim,evidence,status
+C1,The workflow creates a complete three-phase N-1 dataset from scenario and contingency catalogs.,week8_dataset_lineage_summary.csv; table1_dataset_statistics.tex,supported
+C2,"The binary violation label is consistent with voltage, loading, VUF, service-loss, and non-convergence flags.",week8_violation_summary.csv; label consistency proof in Notebook 08,supported
+C3,The best zero-missed-violation holdout model is GradientBoosting with PF calls saved fraction 0.400.,week8_model_comparison_table.csv; table2_model_comparison.tex,supported
+C4,Group-based CV provides a stricter test than random holdout because scenarios and contingencies are separated by group.,week8_group_cv_synthesis.csv; table3_group_cv.tex,supported
+C5,Top-k screening provides an operator-oriented way to reduce the contingency list sent to three-phase power flow.,week8_topk_table.csv; fig5_week7_topk_violation_recall.png,supported
+L1,"The current benchmark is a small teaching feeder, so results should not be claimed as broad deployment evidence.",dataset statistics and Week 7 discussion; future work section,limitation

@@ -1,0 +1,16 @@
+scenario_id,contingency_id,contingency_type,element_name,converged,unserved_load_mw,min_vm_pu,max_line_loading_percent,max_vuf_percent,violation_label,severity_score
+base,line_0_out,line_outage,L0_PCC_to_main,False,0.06799999999999999,,,,True,1.0
+base,line_1_out,line_outage,L1_main_to_critical,False,0.052,,,,True,1.0
+high_load,line_0_out,line_outage,L0_PCC_to_main,False,0.08499999999999999,,,,True,1.0
+high_load,line_1_out,line_outage,L1_main_to_critical,False,0.065,,,,True,1.0
+base,line_7_out,line_outage,L7_critical_to_medical,False,0.01,,,,True,1.0
+base,pcc_outage,pcc_outage,PCC_slack_grid_connected,False,0.06799999999999999,,,,True,1.0
+phase_b_heavy,line_0_out,line_outage,L0_PCC_to_main,False,0.0755,,,,True,1.0
+high_pv_midday,line_1_out,line_outage,L1_main_to_critical,False,0.039,,,,True,1.0
+high_pv_midday,line_7_out,line_outage,L7_critical_to_medical,False,0.007500000000000001,,,,True,1.0
+high_load,pcc_outage,pcc_outage,PCC_slack_grid_connected,False,0.08499999999999999,,,,True,1.0
+high_pv_midday,line_0_out,line_outage,L0_PCC_to_main,False,0.051000000000000004,,,,True,1.0
+high_load,line_7_out,line_outage,L7_critical_to_medical,False,0.0125,,,,True,1.0
+high_load,line_2_out,line_outage,L2_main_to_residential,False,0.02,,,,True,1.0
+stress_unbalance,line_2_out,line_outage,L2_main_to_residential,False,0.03216,,,,True,1.0
+bess_charging,line_0_out,line_outage,L0_PCC_to_main,False,0.0736,,,,True,1.0

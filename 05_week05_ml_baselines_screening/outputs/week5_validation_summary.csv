@@ -1,0 +1,13 @@
+check,passed,detail
+schema_proof,True,"rows=77, features=32"
+target_has_two_classes,True,"{1: 47, 0: 30}"
+leakage_guard,True,
+random_split_disjoint,True,
+threshold_chosen_on_validation,True,"selected_model=GradientBoosting, tau=0.3009"
+manual_confusion_matrix,True,"TP=12, FP=0, TN=8, FN=0"
+scenario_group_cv_completed,True,rows=12
+contingency_group_cv_completed,True,rows=12
+group_cv_split_disjoint,True,GroupKFold assertions passed inside evaluate_group_cv
+topk_completed,True,ranking_model=GradientBoosting
+reproducibility,True,max_diff=0.000e+00
+output_figures_exist,True,

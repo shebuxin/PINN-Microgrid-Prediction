@@ -1,0 +1,3 @@
+threshold,TP,FP,TN,FN,recall,precision,fnr,pf_calls_saved_fraction,missed_violations,auprc,auroc,model,selected_threshold,threshold_source
+0.01,12,2,6,0,1.0,0.8571428571428571,0.0,0.3,0,1.0,1.0,BaselineMLP,0.01,validation
+0.005,12,0,8,0,1.0,1.0,0.0,0.4,0,1.0,1.0,PI-MLP full,0.005,validation

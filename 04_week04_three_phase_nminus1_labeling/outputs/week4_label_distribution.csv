@@ -1,0 +1,8 @@
+contingency_type,violation_label,count
+bess_trip,False,6
+bess_trip,True,1
+line_outage,False,6
+line_outage,True,36
+pcc_outage,True,7
+pv_trip,False,18
+pv_trip,True,3

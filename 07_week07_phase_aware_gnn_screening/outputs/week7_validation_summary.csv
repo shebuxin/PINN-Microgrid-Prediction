@@ -1,0 +1,45 @@
+check,passed,detail
+base_graph_connected,True,Base graph is connected.
+base_graph_radial,True,Edges = buses - 1.
+directed_edge_count,True,Two directed edges per line.
+node_tensor_finite,True,"shape=(77, 9, 26)"
+edge_tensor_finite,True,"shape=(77, 16, 6)"
+global_tensor_finite,True,"shape=(77, 16)"
+line_outage_mask_exactly_two_directed_edges,True,One undirected line = two directed edges.
+non_line_contingencies_do_not_remove_edges,True,PV/BESS/PCC do not change line availability.
+pv_trip_marks_one_bus,True,Each PV trip marks exactly one PV bus.
+bess_trip_marks_one_bus,True,BESS trip marks the BESS bus.
+pcc_outage_marks_one_bus,True,PCC outage marks the PCC bus.
+no_post_contingency_feature_columns,True,set()
+split_disjoint_train_val,True,
+split_disjoint_train_test,True,
+split_disjoint_val_test,True,
+preprocessed_train_finite,True,
+edge_availability_kept_binary,True,
+edge_outage_flag_kept_binary,True,
+gnn_forward_shape,True,
+gnn_finite_loss_and_gradients,True,loss=0.7375102043151855
+permutation_invariance_untrained_gnn,True,max_diff=0.000e+00
+manual_confusion_matrix_keys,True,
+threshold_selected_from_validation_only,True,
+scenario_cv_disjoint_base,True,
+scenario_cv_disjoint_bess_charging,True,
+scenario_cv_disjoint_evening_peak_bess_discharge,True,
+scenario_cv_disjoint_high_load,True,
+scenario_cv_disjoint_high_pv_midday,True,
+scenario_cv_disjoint_phase_b_heavy,True,
+scenario_cv_disjoint_stress_unbalance,True,
+contingency_cv_disjoint_bess_trip,True,
+contingency_cv_disjoint_line_0_out,True,
+contingency_cv_disjoint_line_1_out,True,
+contingency_cv_disjoint_line_2_out,True,
+contingency_cv_disjoint_line_3_out,True,
+contingency_cv_disjoint_line_6_out,True,
+contingency_cv_disjoint_line_7_out,True,
+contingency_cv_disjoint_pcc_outage,True,
+contingency_cv_disjoint_pv_0_trip,True,
+contingency_cv_disjoint_pv_1_trip,True,
+contingency_cv_disjoint_pv_2_trip,True,
+scenario_oof_scores_finite,True,
+contingency_oof_scores_finite,True,
+topk_table_finite,True,

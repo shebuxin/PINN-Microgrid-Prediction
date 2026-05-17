@@ -1,0 +1,71 @@
+
+\documentclass[UTF8,11pt]{ctexart}
+\usepackage[a4paper,margin=0.8in]{geometry}
+\usepackage{xcolor,hyperref}
+\usepackage{fancyvrb}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
+\title{三相微电网 AI 安全预测课程材料总体验收报告}
+\author{Reviewed Release}
+\date{\today}
+\begin{document}
+\maketitle
+\section{总体结论}
+本报告对科研设计、8 周 Beamer 课件、Jupyter Notebook、输出表格、验证结果和论文复现包进行了总体验收。最终执行版 Notebook 无错误输出；Week 2--8 的验证表均通过；Week 4--7 的数据、标签、特征泄漏、阈值选择和交叉验证逻辑均通过一致性检查。
+
+当前材料适合用于课程教学、学生科研入门、mini-paper 写作和后续扩展为正式会议/期刊论文的研究原型。
+
+\section{科研设计 Review}
+科研故事线是：基于 pandapower 三相不平衡潮流生成微电网 N-1 静态安全标签，然后使用 ML、physics-informed MLP 和 phase-aware GNN 进行 high-recall contingency pre-screening。AI 模型不替代潮流软件，而是在保持高召回率的前提下减少需要精算的三相潮流调用。
+
+正式论文应将当前结果定位为教学级 MVP，并在投稿前扩展到更多场景、更大 feeder、更多 OOD splits 和更强的 uncertainty / calibration 评估。
+
+\section{教学材料闭环}
+\begin{itemize}
+\item Week 1: microgrid + pandapower 基础。
+\item Week 2: 三相不平衡潮流与对称分量 proof。
+\item Week 3: operating scenario generation。
+\item Week 4: 三相 N-1 labeling。
+\item Week 5: ML baseline 与安全筛查指标。
+\item Week 6: physics-informed / limit-aware MLP。
+\item Week 7: phase-aware GNN 与 top-k screening。
+\item Week 8: mini-paper、复现清单和最终展示。
+\end{itemize}
+
+\section{总体验证摘要}
+\begin{Verbatim}[fontsize=\scriptsize]
+[PASS] final_executed_notebooks_have_no_error_outputs: 8 notebooks checked; executed_code_cells=[20, 18, 10, 14, 17, 20, 13, 
+[PASS] week3_validation_summary_all_passed: 12/12 checks passed
+[PASS] week4_validation_summary_all_passed: 13/13 checks passed
+[PASS] week5_validation_summary_all_passed: 12/12 checks passed
+[PASS] week6_validation_summary_all_passed: 16/16 checks passed
+[PASS] week7_validation_summary_all_passed: 44/44 checks passed
+[PASS] week8_validation_summary_all_passed: 22/22 checks passed
+[PASS] week2_numerical_proofs_within_tolerance: max_vuf=1.60e-14, max_p=6.56e-09, max_current=8.33e-17, max_loading=5.
+[PASS] week4_dataset_sample_count_matches_scenarios_times_cont: 7 scenarios x 11 contingencies = 77; rows=77
+[PASS] week4_label_distribution_has_safe_and_unsafe: labels={True: 47, False: 30}
+[PASS] week5_ml_dataset_preserves_week4_rows: week5_rows=77, week4_rows=77
+[PASS] week5_feature_list_no_obvious_post_contingency_leakage: 32 features; suspicious=[]
+[PASS] week_1_pdf_compiled_expected_pages: pages=31, expected=31, size_bytes=354223
+[PASS] week_2_pdf_compiled_expected_pages: pages=35, expected=35, size_bytes=336072
+[PASS] week_3_pdf_compiled_expected_pages: pages=34, expected=34, size_bytes=225630
+[PASS] week_4_pdf_compiled_expected_pages: pages=40, expected=40, size_bytes=301449
+[PASS] week_5_pdf_compiled_expected_pages: pages=36, expected=36, size_bytes=514621
+[PASS] week_6_pdf_compiled_expected_pages: pages=41, expected=41, size_bytes=384848
+[PASS] week_7_pdf_compiled_expected_pages: pages=37, expected=37, size_bytes=493372
+[PASS] week_8_pdf_compiled_expected_pages: pages=42, expected=42, size_bytes=470467
+\end{Verbatim}
+
+\section{关键结果解释}
+当前数据集为 7 个 scenario 和 11 个 contingency，共 77 个 N-1 样本，其中 unsafe 样本 47 个，safe 样本 30 个。GradientBoosting、PI-MLP full 和 FlattenedMLP 在 random holdout 上均达到 zero missed violation，并保存约 40\% 的 PF calls。由于样本规模较小，该结果应作为教学演示和方法验证，而不是部署级结论。
+
+Week 7 中 PhaseAwareGNN 在小数据下未超过 FlattenedMLP，这一点已在课程材料中如实处理。GNN 的主要价值是建立 topology-aware / contingency-aware 的可扩展接口；若要证明性能优势，应增加更多 feeder、更多随机 scenario 和 phase-level graph 设计。
+
+\section{建议}
+\begin{itemize}
+\item 保留当前 9-bus teaching feeder 作为课堂 proof-heavy MVP。
+\item 正式论文扩展到数百或数千 operating scenarios。
+\item 将 service-loss、no-slack 和 PF-solvable contingency 分开报告。
+\item 增加 calibration、conformal prediction 或 selective classification，支持保守安全筛查。
+\item 把 feature leakage audit、validation-only threshold selection 和 group CV 写入论文方法部分。
+\end{itemize}
+\end{document}

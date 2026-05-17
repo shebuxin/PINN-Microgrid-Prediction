@@ -1,0 +1,9 @@
+category,item,path
+paper,main.tex,/mnt/data/week8_outputs_complete/paper/main.tex
+paper,paper tables,/mnt/data/week8_outputs_complete/paper/tables
+paper,paper figures,/mnt/data/week8_outputs_complete/paper/figures
+presentation,final presentation outline,/mnt/data/week8_outputs_complete/presentation/final_presentation_outline.md
+audit,artifact manifest,/mnt/data/week8_outputs_complete/week8_artifact_manifest.csv
+audit,validation summary,/mnt/data/week8_outputs_complete/week8_validation_summary.csv
+audit,claim evidence table,/mnt/data/week8_outputs_complete/week8_claim_evidence_table.csv
+audit,reproducibility checklist,/mnt/data/week8_outputs_complete/week8_reproducibility_checklist.csv

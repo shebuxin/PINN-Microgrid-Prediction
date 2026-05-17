@@ -1,0 +1,11 @@
+{
+  "scenarios": 7,
+  "contingencies": 11,
+  "samples": 77,
+  "unsafe_samples": 47,
+  "safe_samples": 30,
+  "power_flow_solved_rows": 35,
+  "skipped_service_loss_rows": 35,
+  "skipped_no_slack_rows": 7,
+  "validation_all_passed": true
+}

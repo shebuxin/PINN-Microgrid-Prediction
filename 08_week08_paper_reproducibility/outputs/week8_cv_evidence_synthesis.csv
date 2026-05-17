@@ -1,0 +1,3 @@
+cv_type,best_model_by_recall,stage,mean_recall,mean_fnr,mean_pf_calls_saved,evidence_file
+contingency_group,EngineeringRule,Week 5 ML baseline,1.0,0.0,0.3095238095238095,week8_group_cv_synthesis.csv
+scenario_group,EngineeringRule,Week 5 ML baseline,1.0,0.0,0.3232323232323232,week8_group_cv_synthesis.csv

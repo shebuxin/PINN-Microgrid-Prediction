@@ -1,0 +1,5 @@
+source,n_features,n_suspicious,suspicious_features
+week5_feature_list,32,0,
+week7_node_feature_list,26,0,
+week7_edge_feature_list,6,0,
+week7_global_feature_list,16,0,

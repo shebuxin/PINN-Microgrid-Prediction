@@ -1,0 +1,13 @@
+{
+  "n_samples": 77,
+  "n_scenarios": 7,
+  "n_contingencies": 11,
+  "n_unsafe": 47,
+  "n_safe": 30,
+  "node_feature_dim": 26,
+  "edge_feature_dim": 6,
+  "global_feature_dim": 16,
+  "best_holdout_model_by_saved_calls": "FlattenedMLP",
+  "validation_checks_passed": 44,
+  "validation_checks_total": 44
+}

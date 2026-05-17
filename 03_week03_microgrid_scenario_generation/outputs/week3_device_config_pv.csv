@@ -1,0 +1,4 @@
+idx,bus_name,bus,phase,rating_mw,name
+0,PV_A_bus,4,a,0.006,PV_single_phase_A
+1,PV_C_bus,5,c,0.006,PV_single_phase_C
+2,Remote_bus,7,abc,0.006,PV_three_phase_remote

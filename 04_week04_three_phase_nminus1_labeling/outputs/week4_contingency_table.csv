@@ -1,0 +1,12 @@
+contingency_id,contingency_type,element_table,element_index,element_name,description
+line_0_out,line_outage,line,0,L0_PCC_to_main,Open line L0_PCC_to_main
+line_1_out,line_outage,line,1,L1_main_to_critical,Open line L1_main_to_critical
+line_2_out,line_outage,line,2,L2_main_to_residential,Open line L2_main_to_residential
+line_3_out,line_outage,line,3,L3_residential_to_pvA,Open line L3_residential_to_pvA
+line_6_out,line_outage,line,6,L6_ev_to_remote,Open line L6_ev_to_remote
+line_7_out,line_outage,line,7,L7_critical_to_medical,Open line L7_critical_to_medical
+pv_0_trip,pv_trip,asymmetric_sgen,0,PV_single_phase_A,Trip PV PV_single_phase_A
+pv_1_trip,pv_trip,asymmetric_sgen,1,PV_single_phase_C,Trip PV PV_single_phase_C
+pv_2_trip,pv_trip,asymmetric_sgen,2,PV_three_phase_remote,Trip PV PV_three_phase_remote
+bess_trip,bess_trip,bess_pair,bess_static_setpoint,BESS_static_setpoint,Trip BESS static setpoint
+pcc_outage,pcc_outage,ext_grid,0,PCC_slack_grid_connected,Disconnect the PCC/slack equivalent

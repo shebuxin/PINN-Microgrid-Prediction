@@ -1,0 +1,438 @@
+\documentclass[UTF8,11pt]{ctexart}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{booktabs,longtable,array}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{multirow}
+\hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
+\setlist[itemize]{leftmargin=2em}
+\setlist[enumerate]{leftmargin=2em}
+
+\title{基于 Physics-informed AI 的微电网三相不平衡静态安全预测：\\科研故事线与论文计划}
+\author{Research Planning Draft}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{项目定位}
+
+本文档规划一个以 \textbf{pandapower 三相不平衡潮流}为仿真内核、以\textbf{微电网静态安全预测}为应用场景、以\textbf{Physics-informed AI / 图学习}为方法主体的科研项目。建议论文英文题目暂定为：
+
+\begin{quote}
+\textbf{Physics-informed Phase-aware Graph Learning for Fast Static N-1 Security Screening in Unbalanced Microgrids}
+\end{quote}
+
+中文题目可写为：
+
+\begin{quote}
+\textbf{基于物理约束相感知图学习的三相不平衡微电网 N-1 静态安全快速筛查}
+\end{quote}
+
+项目核心思想是：在大量微电网运行场景下，用 pandapower 的三相不平衡潮流计算生成 ground truth，然后训练 AI 模型快速判断某个 N-1 事件是否会导致相电压越限、线路/变压器过载、电压不平衡超限或潮流不收敛。AI 模型不直接替代潮流软件，而是作为 conservative pre-screening module，用于减少需要精确三相潮流复算的 contingency 数量。
+
+\section{科研故事线}
+
+\subsection{工程背景：微电网安全评估不再是简单的正序平衡问题}
+
+传统输电网静态安全分析通常以正序平衡模型为主，N-1 contingency 的核心关注点是线路热稳定、母线电压和潮流可解性。微电网和低压配电网的情况不同：
+
+\begin{itemize}
+    \item 微电网包含分布式光伏、储能、柴油机或 grid-forming inverter，以及关键负荷与非关键负荷。
+    \item 低压网络中大量负荷和 DER 可能是单相接入，导致三相负荷和电压天然不平衡。
+    \item 微电网可能在并网和孤岛两种模式下运行；同一个 N-1 事件在两种模式下的风险可能完全不同。
+    \item 仅使用平衡潮流可能无法发现 phase-specific undervoltage、phase-specific overload 和 voltage unbalance 风险。
+\end{itemize}
+
+因此，微电网静态安全评估需要一个三相不平衡视角。
+
+\subsection{计算挑战：全量三相 N-1 扫描可行但昂贵}
+
+对每个运行点 $x_t$ 和每个 contingency $c$ 都运行一次三相不平衡潮流，可以得到准确标签，但在以下情况下计算量会迅速增加：
+
+\begin{itemize}
+    \item 需要覆盖日内时序、光伏波动、EV 充电、负荷不确定性和储能调度；
+    \item contingency 集合包含线路退出、变压器退出、PCC 断开、DER trip、BESS trip、关键支路开断等；
+    \item 需要进行 Monte Carlo 或 scenario-based 静态安全分析；
+    \item 需要在微电网控制器或能量管理系统中近实时筛查高风险状态。
+\end{itemize}
+
+这使得 AI surrogate 或 AI pre-screening 成为有价值的研究方向。
+
+\subsection{技术缺口：多数 AI 安全预测没有充分利用三相物理结构}
+
+普通机器学习可以把运行状态和 contingency 编码为特征，然后预测 violation label。但这种黑箱模型有三个问题：
+
+\begin{itemize}
+    \item 难以保证对危险 contingency 的高召回率；
+    \item 难以泛化到未见过的负荷不平衡、DER 出力和拓扑扰动；
+    \item 难以解释模型为什么判断某一相、某一支路或某个 PCC 场景高风险。
+\end{itemize}
+
+微电网三相安全预测本身具有明确物理结构：节点--支路拓扑、相别、序分量、相电压、相电流、功率平衡、热稳定约束和电压不平衡约束。因此，模型应当把这些物理结构显式纳入特征、网络结构或损失函数中。
+
+\subsection{核心假设}
+
+本项目的核心假设是：
+
+\begin{quote}
+如果 AI 模型同时利用微电网拓扑、三相相别信息、contingency mask 和电力系统约束，则它可以在保持高 violation recall 的前提下，显著减少三相不平衡 N-1 潮流扫描次数。
+\end{quote}
+
+\section{系统建模与问题定义}
+
+\subsection{三相微电网图模型}
+
+将微电网表示为三相图：
+\begin{equation}
+    \mathcal{G} = (\mathcal{N}, \mathcal{E}, \Phi), \quad \Phi = \{a,b,c\},
+\end{equation}
+其中 $\mathcal{N}$ 为母线集合，$\mathcal{E}$ 为线路、变压器、开关等支路集合，$\Phi$ 为相集合。
+
+在运行点 $t$ 下，节点相特征可表示为：
+\begin{equation}
+    \bm{x}_{i,\phi,t} = [P^{load}_{i,\phi,t}, Q^{load}_{i,\phi,t}, P^{PV}_{i,\phi,t}, Q^{PV}_{i,\phi,t}, P^{BESS}_{i,\phi,t}, Q^{BESS}_{i,\phi,t}, V^{0}_{i,\phi,t}, \theta^{0}_{i,\phi,t}, \cdots],
+\end{equation}
+边特征可表示为：
+\begin{equation}
+    \bm{e}_{\ell} = [r_{\ell}, x_{\ell}, r_{0,\ell}, x_{0,\ell}, c_{\ell}, c_{0,\ell}, I^{max}_{\ell}, \text{phase connection}, \text{switch status}, \cdots].
+\end{equation}
+
+contingency $c$ 可通过设备类型、设备 ID、outage mask 和受影响相别编码：
+\begin{equation}
+    \bm{m}_c = [\text{element type}, \text{element index}, \text{phase mask}, \text{grid-connected/islanded flag}, \cdots].
+\end{equation}
+
+\subsection{三相 N-1 潮流输出}
+
+对每个运行状态 $x_t$ 和 contingency $c$，运行三相潮流，得到：
+\begin{equation}
+    \{V^{c}_{i,\phi,t}, \theta^{c}_{i,\phi,t}, I^{c}_{\ell,\phi,t}, S^{c}_{\ell,\phi,t}\}, \quad i \in \mathcal{N}, \ell \in \mathcal{E}, \phi \in \Phi.
+\end{equation}
+
+如果潮流不收敛，记为：
+\begin{equation}
+    \eta^{c}_{t}=0,
+\end{equation}
+否则 $\eta^{c}_{t}=1$。
+
+\subsection{安全越限定义}
+
+定义四类静态安全风险：
+
+\paragraph{相电压越限}
+\begin{equation}
+    s_V(x_t,c) = \max_{i,\phi}\left\{\left[\frac{|V^{c}_{i,\phi,t}|-V^{max}_{i}}{V^{max}_{i}}\right]_+,\left[\frac{V^{min}_{i}-|V^{c}_{i,\phi,t}|}{V^{min}_{i}}\right]_+\right\}.
+\end{equation}
+
+\paragraph{线路/变压器热越限}
+\begin{equation}
+    s_I(x_t,c) = \max_{\ell,\phi}\left[\frac{|I^{c}_{\ell,\phi,t}|}{I^{max}_{\ell,\phi}} - 1\right]_+.
+\end{equation}
+
+\paragraph{电压不平衡越限}
+用对称分量定义母线 $i$ 的 voltage unbalance factor：
+\begin{equation}
+    \mathrm{VUF}^{c}_{i,t} = \frac{|V^{(2),c}_{i,t}|}{|V^{(1),c}_{i,t}|},
+\end{equation}
+其中 $V^{(1)}$ 为正序电压，$V^{(2)}$ 为负序电压。对应严重度为：
+\begin{equation}
+    s_U(x_t,c) = \max_i \left[\frac{\mathrm{VUF}^{c}_{i,t}}{\mathrm{VUF}^{max}}-1\right]_+.
+\end{equation}
+
+\paragraph{潮流不可解或孤岛不可供电}
+\begin{equation}
+    s_C(x_t,c)=\mathbb{I}(\eta^{c}_{t}=0).
+\end{equation}
+
+综合 violation severity 定义为：
+\begin{equation}
+    s(x_t,c)=\max\{s_V(x_t,c),s_I(x_t,c),s_U(x_t,c),\gamma s_C(x_t,c)\},
+\end{equation}
+其中 $\gamma$ 是不可解事件的惩罚权重。分类标签为：
+\begin{equation}
+    y(x_t,c)=\mathbb{I}(s(x_t,c)>0).
+\end{equation}
+
+\section{数据生成计划}
+
+\subsection{基础测试系统}
+
+建议以 pandapower 的 IEEE European LV asymmetric network 为第一阶段主系统。该网络可以作为低压微电网馈线骨架，然后人为加入 PCC、PV、BESS、grid-forming source、关键负荷和非关键负荷。
+
+\subsection{微电网场景构造}
+
+构造如下运行场景：
+
+\begin{enumerate}
+    \item \textbf{并网模式}：PCC 与上级电网连接，外部电网或主变压器提供参考电压。
+    \item \textbf{孤岛模式}：PCC 断开，由 grid-forming inverter、柴油机或 BESS 作为参考源。
+    \item \textbf{高 PV 低负荷}：模拟午间电压升高和反向潮流。
+    \item \textbf{低 PV 高负荷}：模拟晚高峰电压跌落和线路重载。
+    \item \textbf{强相不平衡}：单相负荷、单相 PV、EV 充电集中接入某些相。
+    \item \textbf{储能调度扰动}：BESS 充电、放电和无功支撑不同设定。
+\end{enumerate}
+
+\subsection{Contingency 集合}
+
+MVP 阶段建议只做以下 N-1 事件：
+
+\begin{itemize}
+    \item 线路 outage：$c = \texttt{line}(\ell)$；
+    \item 变压器 outage：$c = \texttt{trafo}(k)$；
+    \item PCC outage：并网模式下的并网点断开，切换为孤岛运行；
+    \item DER trip：PV、BESS 或柴油机退出；
+    \item phase-specific outage：可作为高级扩展，例如单相支路断线或单相负荷/DER 丢失。
+\end{itemize}
+
+\subsection{数据表结构}
+
+每一条训练样本对应一个 $(x_t,c)$ pair：
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+字段 & 示例 & 用途 \\
+\midrule
+scenario\_id & highPV\_islanded\_001 & 运行场景索引 \\
+mode & grid-connected / islanded & 微电网模式 \\
+contingency\_type & line / trafo / pcc / der & N-1 类型 \\
+contingency\_id & element index & N-1 设备 ID \\
+base features & $V^0$, $I^0$, $P$, $Q$ & AI 输入 \\
+post-contingency outputs & $V^c$, $I^c$, VUF & 可选监督目标 \\
+label & 0/1 & 是否越限 \\
+severity & real value & 越限严重度 \\
+violation\_type & voltage/current/VUF/non-converged & 可解释标签 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{AI 模型计划}
+
+\subsection{Baseline 0：规则和物理启发筛查}
+
+\begin{itemize}
+    \item base-case 最大相电流 loading；
+    \item base-case 最小相电压；
+    \item contingency 设备附近的负荷/DER 总量；
+    \item 简化灵敏度指标，例如电气距离、支路阻抗、下游负荷比例。
+\end{itemize}
+
+该 baseline 作为工程解释性下限。
+
+\subsection{Baseline 1：传统机器学习}
+
+训练以下模型：
+
+\begin{itemize}
+    \item Logistic Regression；
+    \item Random Forest；
+    \item Gradient Boosting / XGBoost / LightGBM；
+    \item MLP。
+\end{itemize}
+
+输入特征使用 base-case 三相潮流结果、负荷/DER 场景、储能设定和 contingency one-hot/embedding。
+
+\subsection{Model 2：Physics-informed MLP}
+
+MLP 输出 violation probability、severity，以及可选的 post-contingency 相电压/相电流近似：
+\begin{equation}
+    \hat{y}, \hat{s}, \widehat{V}_{i,\phi}^{c}, \widehat{I}_{\ell,\phi}^{c}=f_{\theta}(x_t,c).
+\end{equation}
+
+训练损失为：
+\begin{equation}
+    \mathcal{L}=\mathcal{L}_{cls}+\lambda_s\mathcal{L}_{sev}+\lambda_r\mathcal{L}_{rank}+\lambda_{lim}\mathcal{L}_{limit}+\lambda_{bal}\mathcal{L}_{balance}+\lambda_{seq}\mathcal{L}_{seq}.
+\end{equation}
+
+其中：
+\begin{align}
+    \mathcal{L}_{cls} &= \mathrm{WeightedBCE}(y,\hat{y}),\\
+    \mathcal{L}_{sev} &= \|s-\hat{s}\|_1,\\
+    \mathcal{L}_{rank} &= \sum_{(c_i,c_j)} \left[1-(\hat{s}_{c_i}-\hat{s}_{c_j})\mathrm{sign}(s_{c_i}-s_{c_j})\right]_+,\\
+    \mathcal{L}_{limit} &= \sum_{i,\phi}\left[\frac{|\widehat{V}_{i,\phi}^{c}|-V_i^{max}}{V_i^{max}}\right]^2_+ + \sum_{i,\phi}\left[\frac{V_i^{min}-|\widehat{V}_{i,\phi}^{c}|}{V_i^{min}}\right]^2_+ + \sum_{\ell,\phi}\left[\frac{|\widehat{I}_{\ell,\phi}^{c}|}{I_{\ell,\phi}^{max}}-1\right]^2_+.
+\end{align}
+
+$\mathcal{L}_{balance}$ 可用相域注入功率残差构造；$\mathcal{L}_{seq}$ 可用于约束预测电压的正序、负序、零序分量与三相电压之间的一致性。
+
+\subsection{Model 3：Phase-aware GNN}
+
+将每个 bus-phase 视为节点，或将 bus 作为节点并在节点特征中保留三相通道：
+
+\begin{itemize}
+    \item \textbf{bus-level GNN}：节点为 bus，节点特征包含 $a,b,c$ 三相变量；实现简单。
+    \item \textbf{phase-level GNN}：节点为 $(bus,phase)$，可以更自然地建模相间不平衡；实现复杂。
+\end{itemize}
+
+建议 MVP 先做 bus-level phase-channel GNN：
+\begin{equation}
+    \bm{h}^{(k+1)}_i = \sigma\left(\bm{W}_0\bm{h}^{(k)}_i + \sum_{j\in\mathcal{N}(i)} \alpha_{ij}^{(k)} \bm{W}_1 [\bm{h}^{(k)}_j, \bm{e}_{ij}, \bm{m}_c]\right).
+\end{equation}
+
+最终图级输出为：
+\begin{equation}
+    \hat{y},\hat{s}=\mathrm{Readout}(\{\bm{h}_i^{(K)}\}_{i\in\mathcal{N}},\bm{m}_c).
+\end{equation}
+
+\section{实验设计}
+
+\subsection{主实验}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+实验 & 目的 \\
+\midrule
+E0: 三相潮流 sanity check & 验证 pandapower runpp\_3ph、结果提取和越限标签 \\
+E1: 全量 N-1 ground truth & 生成 $(x_t,c)$ 数据集 \\
+E2: 传统 ML baseline & 确认问题可学习，建立下限 \\
+E3: PI-MLP & 验证 limit / balance / sequence loss 的作用 \\
+E4: Phase-aware GNN & 验证拓扑和 contingency mask 的价值 \\
+E5: High-recall screening & 评估 threshold tuning 与 AC PF 调用节省率 \\
+E6: OOD 泛化 & 测试未见过负荷水平、PV 出力、孤岛模式或 contingency \\
+E7: Ablation study & 去掉相别特征、物理损失、contingency mask、GNN edge feature \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{评价指标}
+
+安全筛查最重要的是少漏报，因此以 recall 和 false negative rate 为核心：
+
+\begin{itemize}
+    \item Recall of violation；
+    \item False negative rate；
+    \item Precision, F1, AUROC, AUPRC；
+    \item Top-$k$ hit rate：最严重 contingency 是否进入模型预测前 $k$；
+    \item Missed severity：漏报 contingency 的最大/平均严重度；
+    \item AC PF calls saved：筛查后节省的三相潮流计算次数；
+    \item Runtime speedup：相对于 full three-phase N-1 scan 的加速比；
+    \item Calibration：reliability diagram, expected calibration error；
+    \item OOD performance：负荷、PV、拓扑、并网/孤岛模式迁移。
+\end{itemize}
+
+\section{论文计划}
+
+\subsection{会议论文版本}
+
+建议标题：
+
+\begin{quote}
+\textbf{Physics-informed Phase-aware Learning for Fast N-1 Security Screening in Unbalanced Microgrids}
+\end{quote}
+
+目标：先做一篇方法完整、实验闭环的会议论文。篇幅 6--8 页。
+
+\paragraph{主要贡献}
+\begin{enumerate}
+    \item 提出一个基于 pandapower 三相不平衡潮流的微电网 N-1 安全数据生成框架；
+    \item 定义 phase-aware violation severity，统一刻画相电压越限、线路/变压器相电流越限、电压不平衡越限和潮流不可解；
+    \item 提出 physics-informed AI 模型，将 limit penalty、sequence consistency、power balance residual 或 ranking loss 融入训练；
+    \item 在微电网并网/孤岛、多负荷不平衡和多 DER 场景下验证 high-recall screening 能节省三相 N-1 潮流计算。
+\end{enumerate}
+
+\paragraph{论文结构}
+\begin{enumerate}
+    \item Introduction
+    \item Three-phase Static Security Assessment in Microgrids
+    \item Dataset Generation with pandapower Unbalanced Power Flow
+    \item Physics-informed Phase-aware Learning Model
+    \item Experimental Setup
+    \item Results and Ablation Studies
+    \item Discussion, Limitations, and Deployment Considerations
+    \item Conclusion
+\end{enumerate}
+
+\paragraph{必备图表}
+\begin{itemize}
+    \item Fig. 1: 微电网三相 N-1 安全筛查故事图；
+    \item Fig. 2: 数据生成 pipeline；
+    \item Fig. 3: phase-aware GNN / PI-MLP 模型结构；
+    \item Fig. 4: violation label distribution；
+    \item Fig. 5: recall--threshold 曲线；
+    \item Fig. 6: AC PF calls saved vs missed violations；
+    \item Table I: 数据集统计；
+    \item Table II: 模型性能比较；
+    \item Table III: ablation study；
+    \item Table IV: OOD generalization。
+\end{itemize}
+
+\subsection{期刊论文扩展版本}
+
+建议标题：
+
+\begin{quote}
+\textbf{Trustworthy Physics-informed Graph Learning for Three-phase Security Assessment of Inverter-rich Microgrids}
+\end{quote}
+
+在会议论文基础上扩展：
+
+\begin{itemize}
+    \item 增加不确定性量化：conformal prediction 或 selective classification；
+    \item 增加微电网控制策略：BESS/PV reactive power support 对 N-1 风险的影响；
+    \item 增加 phase-level GNN；
+    \item 增加更多测试网络或真实/半真实微电网 feeder；
+    \item 增加解释性分析：哪些相、哪些支路、哪些 DER 对风险判断贡献最大；
+    \item 增加 conservative deployment workflow：AI 只筛掉低风险 contingency，高风险交给 pandapower 三相潮流复核。
+\end{itemize}
+
+\section{MVP 与风险控制}
+
+\subsection{八周内最小可行版本}
+
+\begin{itemize}
+    \item 网络：IEEE European LV asymmetric network 加自定义 PV/BESS/PCC/critical loads；
+    \item 潮流：pandapower runpp\_3ph；
+    \item contingency：line outage + DER trip + PCC outage；
+    \item 标签：phase voltage violation + line current/loading violation + VUF violation + non-convergence；
+    \item 模型：Random Forest、MLP、PI-MLP、bus-level phase-channel GNN；
+    \item 评价：recall、FNR、AUPRC、top-$k$ hit rate、AC PF calls saved、runtime speedup。
+\end{itemize}
+
+\subsection{主要风险与替代方案}
+
+\begin{center}
+\begin{tabular}{p{0.28\linewidth}p{0.34\linewidth}p{0.28\linewidth}}
+\toprule
+风险 & 影响 & 替代方案 \\
+\midrule
+三相孤岛潮流不易收敛 & 标签噪声高 & 先只做并网模式；孤岛作为扩展 \\
+类别极度不平衡 & 高 accuracy 但低 recall & 使用 weighted/focal loss、过采样危险样本、threshold tuning \\
+pandapower 内置 contingency 不满足三相指标需求 & 难提取 phase-specific label & 手写 N-1 loop，直接调用 runpp\_3ph 并读取三相结果表 \\
+BESS SOC 不自动更新 & 时序物理不完整 & 先把 BESS 作为场景变量，手动更新 SOC 或仅做静态 setpoint \\
+GNN 实现耗时 & 八周内无法稳定收敛 & 先完成 MLP/PI-MLP，GNN 作为 Week 7 扩展 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{参考文献起点}
+
+\begin{thebibliography}{9}
+
+\bibitem{doe_microgrid}
+U.S. Department of Energy, Grid Deployment Office, ``Microgrid Overview,'' 2024. [Online]. Available: \url{https://www.energy.gov/sites/default/files/2024-02/46060_DOE_GDO_Microgrid_Overview_Fact_Sheet_RELEASE_508.pdf}
+
+\bibitem{pandapower_main}
+pandapower documentation, ``pandapower 3.4.0 documentation,'' 2026. [Online]. Available: \url{https://pandapower.readthedocs.io/en/latest/}
+
+\bibitem{pandapower_runpp3ph}
+pandapower documentation, ``Asymmetric / Three Phase Power Flow,'' 2026. [Online]. Available: \url{https://pandapower.readthedocs.io/en/latest/powerflow/ac_3ph.html}
+
+\bibitem{pandapower_lvgrid}
+pandapower documentation, ``3-Phase Grid Data,'' 2026. [Online]. Available: \url{https://pandapower.readthedocs.io/en/latest/networks/3phase_grids.html}
+
+\bibitem{pandapower_asym_load}
+pandapower documentation, ``Asymmetric Load,'' 2026. [Online]. Available: \url{https://pandapower.readthedocs.io/en/latest/elements/asymmetric_load.html}
+
+\bibitem{pandapower_asym_sgen}
+pandapower documentation, ``Asymmetric Static Generator,'' 2026. [Online]. Available: \url{https://pandapower.readthedocs.io/en/latest/elements/asymmetric_sgen.html}
+
+\bibitem{pandapower_contingency}
+pandapower documentation, ``Contingency analysis,'' 2026. [Online]. Available: \url{https://pandapower.readthedocs.io/en/latest/contingency.html}
+
+\end{thebibliography}
+
+\end{document}

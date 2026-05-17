@@ -1,0 +1,2 @@
+bus_name,bus,discharge_sgen_idx,charge_load_idx,rating_mw,description
+Medical_bus,8,3,5,0.012,positive setpoint -> asymmetric_sgen; negative setpoint -> asymmetric_load

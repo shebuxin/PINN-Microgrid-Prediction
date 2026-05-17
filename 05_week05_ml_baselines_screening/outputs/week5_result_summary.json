@@ -1,0 +1,11 @@
+{
+  "n_samples": 77,
+  "n_features_before_onehot": 32,
+  "safe_count": 30,
+  "unsafe_count": 47,
+  "selected_model": "GradientBoosting",
+  "ranking_model": "GradientBoosting",
+  "selected_threshold": 0.3009188996948373,
+  "random_seed": 42,
+  "output_dir": "/mnt/data/week5_outputs_complete"
+}

@@ -1,0 +1,14 @@
+test,status,details
+input_network_integrity,passed,"{'status': 'passed', 'n_bus': 9, 'n_line': 8, 'n_load': 6, 'n_sgen': 4, 'connected': True, 'radial': True}"
+contingency_table_schema,passed,"{'status': 'passed', 'n_contingencies': 11, 'types': 'bess_trip, line_outage, pcc_outage, pv_trip'}"
+basecase_convergence,passed,{'n_basecases': 7}
+n0_reference_crosscheck,passed,{'checked_scenarios': 7}
+sample_count,passed,"{'expected_samples': 77, 'actual_samples': 77}"
+no_duplicate_samples,passed,{'duplicates': 0}
+label_consistency,passed,"{'n_safe': 30, 'n_unsafe': 47}"
+metric_finiteness_for_converged_rows,passed,{'n_converged_rows': 35}
+pcc_outage_nonconverged,passed,{'n_pcc_rows': 7}
+line_service_loss_present,passed,"{'line_rows': 42, 'line_rows_with_service_loss': 35}"
+state_restoration,passed,{'state_restoration_failures': 0}
+safe_unsafe_diversity,passed,"{'n_safe': 30, 'n_unsafe': 47}"
+sentinel_scan_reproducibility,passed,"{'compared_rows': 5, 'compared_columns': 11, 'mode': 'sentinel_subset'}"

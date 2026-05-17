@@ -1,0 +1,13 @@
+\begin{table}
+\caption{Loss ablation for physics-informed MLP training.}
+\label{tab:ablation}
+\begin{tabular}{rrrrrrrrrrrrlr}
+\toprule
+threshold & TP & FP & TN & FN & recall & precision & fnr & pf_calls_saved_fraction & missed_violations & auprc & auroc & model & selected_threshold \\
+\midrule
+0.010 & 12 & 2 & 6 & 0 & 1.000 & 0.857 & 0.000 & 0.300 & 0 & 1.000 & 1.000 & BaselineMLP & 0.010 \\
+0.005 & 12 & 1 & 7 & 0 & 1.000 & 0.923 & 0.000 & 0.350 & 0 & 1.000 & 1.000 & PI-MLP no-rank & 0.005 \\
+0.005 & 12 & 0 & 8 & 0 & 1.000 & 1.000 & 0.000 & 0.400 & 0 & 1.000 & 1.000 & PI-MLP full & 0.005 \\
+\bottomrule
+\end{tabular}
+\end{table}

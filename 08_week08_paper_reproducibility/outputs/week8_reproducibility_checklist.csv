@@ -1,0 +1,12 @@
+item,description,passed
+data_lineage,Scenario count × contingency count equals N-1 dataset rows.,True
+label_consistency,Final violation label equals OR of all component violation flags.,True
+validation_summaries,Week 3--7 validation summaries all pass.,True
+no_leakage,Feature lists do not include post-contingency labels or metrics.,True
+threshold_protocol,"Threshold is selected on validation set, not test set.",True
+group_cv,Scenario-group and contingency-group CV results are included.,True
+topk,Top-k screening table is finite and monotonic.,True
+paper_tables,LaTeX tables are generated under paper/tables.,True
+paper_figures,Paper figures are copied under paper/figures with manifest.,True
+claim_evidence,Each main claim has a linked evidence artifact.,True
+limitations,Limitations are explicitly stated.,True

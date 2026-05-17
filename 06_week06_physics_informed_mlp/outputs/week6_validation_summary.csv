@@ -1,0 +1,17 @@
+check,passed,detail
+schema_has_unique_row_id,True,n=77
+binary_labels_and_both_classes_exist,True,"{1: 47, 0: 30}"
+label_severity_consistency,True,
+pi_severity_dominates_component_margins,True,
+no_leakage_feature_set,True,features=33
+no_suspicious_nonbase_feature_names,True,[]
+disjoint_train_val_test,True,
+preprocessed_features_are_finite,True,
+model_output_shapes_pass,True,
+finite_loss_and_gradients,True,
+test_probabilities_are_finite_and_bounded,True,
+manual_confusion_matrix_sums_to_test_n,True,"{""threshold"": 0.005, ""TP"": 12, ""FP"": 0, ""TN"": 8, ""FN"": 0, ""recall"": 1.0, ""precision"": 1.0, ""fnr"": 0.0, ""pf_calls_saved_fraction"": 0.4, ""missed_violations"": 0}"
+threshold_selected_from_validation,True,PI threshold=0.005000
+scenario_group_cv_disjoint,True,
+contingency_group_cv_disjoint,True,
+fixed_seed_reproducibility,True,max_diff=0.000e+00

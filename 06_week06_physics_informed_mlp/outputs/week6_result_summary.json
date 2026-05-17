@@ -1,0 +1,12 @@
+{
+  "n_samples": 77,
+  "n_safe": 30,
+  "n_unsafe": 47,
+  "n_input_features_before_one_hot": 33,
+  "encoded_feature_dim": 45,
+  "target_recall": 0.95,
+  "selected_pi_threshold": 0.005,
+  "validation_checks_passed": 16,
+  "validation_checks_total": 16,
+  "best_holdout_model_by_fnr_then_saved_calls": "PI-MLP full"
+}

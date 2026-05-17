@@ -1,0 +1,22 @@
+\begin{table}
+\caption{Group-based cross-validation for unseen scenarios and contingencies.}
+\label{tab:group_cv}
+\begin{tabular}{lllrrrrrr}
+\toprule
+stage & model & cv_type & folds & mean_recall & mean_fnr & mean_pf_calls_saved & mean_auprc & missed_violations_sum \\
+\midrule
+Week 5 ML baseline & EngineeringRule & scenario\_group & 3 & 1.000 & 0.000 & 0.323 & 0.912 & 0.000 \\
+Week 5 ML baseline & AllUnsafe & scenario\_group & 3 & 1.000 & 0.000 & 0.000 & 0.596 & 0.000 \\
+Week 5 ML baseline & LogisticRegression & scenario\_group & 3 & 0.928 & 0.072 & 0.439 & 0.990 & 5.000 \\
+Week 5 ML baseline & RandomForest & scenario\_group & 3 & 0.899 & 0.101 & 0.475 & 0.990 & 7.000 \\
+Week 5 ML baseline & EngineeringRule & contingency\_group & 3 & 1.000 & 0.000 & 0.310 & 0.971 & 0.000 \\
+Week 5 ML baseline & AllUnsafe & contingency\_group & 3 & 1.000 & 0.000 & 0.000 & 0.619 & 0.000 \\
+Week 5 ML baseline & RandomForest & contingency\_group & 3 & 0.400 & 0.600 & 0.690 & 0.861 & 28.000 \\
+Week 5 ML baseline & LogisticRegression & contingency\_group & 3 & 0.254 & 0.746 & 0.786 & 0.909 & 35.000 \\
+Week 6 PI-MLP & PI-MLP full & contingency\_group & 3 & 0.760 & 0.240 & 0.413 & 0.877 & NaN \\
+Week 6 PI-MLP & PI-MLP full & scenario\_group & 3 & 0.928 & 0.072 & 0.207 & 0.942 & NaN \\
+Week 7 GNN & PhaseAwareGNN & contingency\_group & 11 & 0.896 & 0.104 & 0.247 & NaN & 8.000 \\
+Week 7 GNN & PhaseAwareGNN & scenario\_group & 7 & 0.690 & 0.310 & 0.468 & NaN & 18.000 \\
+\bottomrule
+\end{tabular}
+\end{table}

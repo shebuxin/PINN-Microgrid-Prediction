@@ -1,0 +1,8 @@
+scenario_id,load_scale,phase_a_factor,phase_b_factor,phase_c_factor,pv_scale,bess_p_discharge_mw,mode,description
+base,1.0,1.0,1.0,1.0,0.0,0.0,grid_connected,reference microgrid operating point
+high_load,1.25,1.0,1.0,1.0,0.0,0.0,grid_connected,uniform high-load condition
+high_pv_midday,0.75,1.0,1.0,1.0,1.0,0.0,grid_connected,low load with high PV generation
+phase_b_heavy,1.0,1.0,1.6,1.0,0.0,0.0,grid_connected,B-phase-heavy demand pattern
+evening_peak_bess_discharge,1.3,1.0,1.2,1.0,0.1,0.008,grid_connected,evening peak with small PV and BESS discharge
+bess_charging,1.0,1.0,1.0,1.0,0.2,-0.008,grid_connected,base load with PV and BESS charging
+stress_unbalance,1.35,1.0,1.6,0.8,0.8,-0.008,grid_connected,"combined high load, B-phase stress, PV, and charging"

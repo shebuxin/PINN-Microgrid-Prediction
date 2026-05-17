@@ -1,0 +1,2 @@
+dataset,n_scenarios,n_contingencies,expected_samples,actual_samples,safe_samples,unsafe_samples,power_flow_solved_rows,service_loss_skipped_rows,no_slack_skipped_rows
+Three-phase microgrid N-1 dataset,7,11,77,77,30,47,35,35,7

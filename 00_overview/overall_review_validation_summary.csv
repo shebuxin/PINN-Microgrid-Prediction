@@ -1,0 +1,21 @@
+check,passed,detail
+final_executed_notebooks_have_no_error_outputs,True,"8 notebooks checked; executed_code_cells=[20, 18, 10, 14, 17, 20, 13, 21]; errors=0"
+week3_validation_summary_all_passed,True,12/12 checks passed
+week4_validation_summary_all_passed,True,13/13 checks passed
+week5_validation_summary_all_passed,True,12/12 checks passed
+week6_validation_summary_all_passed,True,16/16 checks passed
+week7_validation_summary_all_passed,True,44/44 checks passed
+week8_validation_summary_all_passed,True,22/22 checks passed
+week2_numerical_proofs_within_tolerance,True,"max_vuf=1.60e-14, max_p=6.56e-09, max_current=8.33e-17, max_loading=5.19e-08"
+week4_dataset_sample_count_matches_scenarios_times_contingencies,True,7 scenarios x 11 contingencies = 77; rows=77
+week4_label_distribution_has_safe_and_unsafe,True,"labels={True: 47, False: 30}"
+week5_ml_dataset_preserves_week4_rows,True,"week5_rows=77, week4_rows=77"
+week5_feature_list_no_obvious_post_contingency_leakage,True,32 features; suspicious=[]
+week_1_pdf_compiled_expected_pages,True,"pages=31, expected=31, size_bytes=354223"
+week_2_pdf_compiled_expected_pages,True,"pages=35, expected=35, size_bytes=336072"
+week_3_pdf_compiled_expected_pages,True,"pages=34, expected=34, size_bytes=225630"
+week_4_pdf_compiled_expected_pages,True,"pages=40, expected=40, size_bytes=301449"
+week_5_pdf_compiled_expected_pages,True,"pages=36, expected=36, size_bytes=514621"
+week_6_pdf_compiled_expected_pages,True,"pages=41, expected=41, size_bytes=384848"
+week_7_pdf_compiled_expected_pages,True,"pages=37, expected=37, size_bytes=493372"
+week_8_pdf_compiled_expected_pages,True,"pages=42, expected=42, size_bytes=470467"

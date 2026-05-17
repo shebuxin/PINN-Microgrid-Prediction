@@ -1,0 +1,756 @@
+
+\documentclass[aspectratio=169,10pt]{ctexbeamer}
+
+\usetheme{Madrid}
+\usecolortheme{seahorse}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+
+\usepackage{amsmath,amssymb,booktabs,array,multirow}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\definecolor{codebg}{RGB}{248,248,248}
+\definecolor{darkblue}{RGB}{0,65,120}
+\definecolor{darkgreen}{RGB}{0,105,70}
+\definecolor{warnorange}{RGB}{190,110,0}
+\definecolor{softred}{RGB}{205,70,70}
+
+\hypersetup{colorlinks=true,linkcolor=darkblue,urlcolor=darkblue}
+
+\lstdefinestyle{pythonstyle}{
+    language=Python,
+    basicstyle=\ttfamily\scriptsize,
+    keywordstyle=\color{darkblue}\bfseries,
+    commentstyle=\color{darkgreen},
+    stringstyle=\color{warnorange},
+    showstringspaces=false,
+    columns=fullflexible,
+    backgroundcolor=\color{codebg},
+    frame=single,
+    rulecolor=\color{black!15},
+    breaklines=true
+}
+\lstset{style=pythonstyle}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\checkitem}{\textcolor{darkgreen}{\Large$\checkmark$}\;}
+\newcommand{\warnitem}{\textcolor{warnorange}{\Large$\triangle$}\;}
+\newcommand{\baditem}{\textcolor{softred}{\Large$\times$}\;}
+
+\title[Week 2: Three-phase pandapower]{Week 2: 三相不平衡潮流建模与验证}
+\subtitle{pandapower \texttt{runpp\_3ph()} for Microgrid Security Prediction}
+\author{ECE Course - Research Tutorial}
+\institute{Microgrid 3-phase Security AI Project}
+\date{2026}
+
+\begin{document}
+
+% ----------------------------------------------------------------------
+\begin{frame}
+  \titlepage
+  \vspace{-0.8em}
+  \begin{center}
+    \small 本周关键词: three-phase, unbalanced power flow, symmetrical components, VUF, proof, cross-validation
+  \end{center}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{本周学习目标}
+\begin{columns}[T]
+\column{0.54\textwidth}
+学生完成 Week 2 后应能:
+\begin{itemize}
+  \item 解释微电网为什么需要三相不平衡潮流;
+  \item 使用 \code{asymmetric\_load} 建模逐相负荷;
+  \item 使用 \code{asymmetric\_sgen} 建模逐相 PV/DER;
+  \item 使用 \code{pp.runpp\_3ph(net)} 运行三相潮流;
+  \item 读取 \code{res\_bus\_3ph}, \code{res\_line\_3ph}, \code{res\_ext\_grid\_3ph};
+  \item 用对称分量、功率平衡和线路电流公式验证结果。
+\end{itemize}
+\column{0.40\textwidth}
+\begin{block}{本周边界}
+本周先把三相 base-case 潮流算对、验对。Week 4 再把相同检查扩展为 N-1 violation label。
+\end{block}
+\begin{alertblock}{本周核心能力}
+不是“会调用函数”, 而是能证明输出结果与基本物理一致。
+\end{alertblock}
+\end{columns}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{Week 2 在八周项目中的位置}
+\centering
+\begin{tikzpicture}[node distance=0.55cm and 0.48cm, every node/.style={font=\scriptsize}]
+\tikzset{box/.style={draw, rounded corners, align=center, minimum width=2.12cm, minimum height=0.68cm, fill=blue!6}}
+\tikzset{active/.style={draw=darkblue, very thick, rounded corners, align=center, minimum width=2.12cm, minimum height=0.68cm, fill=blue!18}}
+\tikzset{arrow/.style={-{Latex[length=2mm]}, thick}}
+\node[box] (w1) {Week 1\\balanced pandapower};
+\node[active, right=of w1] (w2) {Week 2\\三相不平衡潮流};
+\node[box, right=of w2] (w3) {Week 3\\场景生成};
+\node[box, right=of w3] (w4) {Week 4\\N-1 标签};
+\node[box, below=of w1] (w5) {Week 5\\ML baseline};
+\node[box, right=of w5] (w6) {Week 6\\PI-MLP};
+\node[box, right=of w6] (w7) {Week 7\\Phase-aware GNN};
+\node[box, right=of w7] (w8) {Week 8\\论文和展示};
+\draw[arrow] (w1) -- (w2);
+\draw[arrow] (w2) -- (w3);
+\draw[arrow] (w3) -- (w4);
+\draw[arrow] (w4) -- ++(0,-0.48) -| (w5);
+\draw[arrow] (w5) -- (w6);
+\draw[arrow] (w6) -- (w7);
+\draw[arrow] (w7) -- (w8);
+\end{tikzpicture}
+\vspace{0.75em}
+\begin{block}{为什么 Week 2 很重要?}
+后续 AI 模型的输入特征、标签和物理 loss 都来自三相潮流结果。如果三相物理量没有理解清楚, 后续模型只是黑箱拟合。
+\end{block}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{从 Week 1 到 Week 2: 模型复杂度变化}
+\begin{tabular}{p{0.30\textwidth}p{0.30\textwidth}p{0.30\textwidth}}
+\toprule
+项目 & Week 1 & Week 2 \\
+\midrule
+潮流函数 & \code{pp.runpp()} & \code{pp.runpp\_3ph()} \\
+系统假设 & 三相平衡 & 三相不平衡 \\
+负荷模型 & \code{load} & \code{asymmetric\_load} \\
+DER 模型 & \code{sgen} & \code{asymmetric\_sgen} \\
+电压结果 & \code{vm\_pu} & \code{vm\_a/b/c\_pu} \\
+线路结果 & 总 loading & A/B/C 相电流与 loading \\
+新增指标 & - & VUF, 相别越限 \\
+\bottomrule
+\end{tabular}
+\vspace{0.8em}
+\begin{alertblock}{本周必须形成的习惯}
+每次得到 \code{res\_*\_3ph} 后, 都要问: 这些结果是否满足对称分量、功率平衡和线路电流公式?
+\end{alertblock}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\section{科研动机}
+
+\begin{frame}{为什么微电网需要三相不平衡分析?}
+\begin{columns}[T]
+\column{0.53\textwidth}
+低压微电网中常见现象:
+\begin{itemize}
+  \item 单相居民负荷随机接入 A/B/C 相;
+  \item 单相 PV, EV charger, heat pump 造成相间差异;
+  \item BESS 或 inverter 控制可能改变某一相无功支撑;
+  \item 辐射型 feeder 的末端电压更敏感;
+  \item islanded mode 下等效电源更弱, 电压更容易波动。
+\end{itemize}
+\column{0.41\textwidth}
+\begin{block}{平衡模型会漏掉什么?}
+\begin{itemize}
+  \item 单相低电压;
+  \item 单相线路过流;
+  \item 负序电压过高;
+  \item 相别相关的 DER 反向潮流;
+  \item 相别相关的 N-1 风险。
+\end{itemize}
+\end{block}
+\end{columns}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{本课题的三相安全预测任务}
+\centering
+\begin{tikzpicture}[node distance=0.80cm and 0.80cm, every node/.style={font=\scriptsize}]
+\tikzset{box/.style={draw, rounded corners, align=center, minimum width=2.8cm, minimum height=0.85cm, fill=blue!6}}
+\tikzset{arrow/.style={-{Latex[length=2mm]}, thick}}
+\node[box] (x) {运行状态 $x_t$\\逐相负荷/PV/BESS};
+\node[box, right=of x] (pf) {三相潮流\\\code{runpp\_3ph}};
+\node[box, right=of pf] (res) {三相结果\\$V_{i,\phi}, I_{\ell,\phi}$};
+\node[box, below=of res] (label) {安全标签\\voltage/current/VUF};
+\node[box, left=of label] (ai) {AI screening\\MLP/GNN};
+\draw[arrow] (x) -- (pf);
+\draw[arrow] (pf) -- (res);
+\draw[arrow] (res) -- (label);
+\draw[arrow] (x) |- (ai);
+\draw[arrow] (ai) -- (label);
+\end{tikzpicture}
+\vspace{0.8em}
+\begin{block}{Week 2 的角色}
+本周只完成从 $x_t$ 到三相结果的可信计算。后续 Week 4 再在 contingency $c$ 后重复这一流程生成 $y(x_t,c)$。
+\end{block}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{三相静态安全指标}
+对每个 bus $i$, line $\ell$, phase $\phi\in\{a,b,c\}$:
+\vspace{0.2em}
+\begin{align*}
+\text{Voltage violation:}\quad & |V_{i,\phi}| < V_i^{\min} \quad \text{or} \quad |V_{i,\phi}| > V_i^{\max} \\
+\text{Current violation:}\quad & |I_{\ell,\phi}| > I_{\ell}^{\max} \\
+\text{Unbalance violation:}\quad & \mathrm{VUF}_{i} > \mathrm{VUF}^{\max}
+\end{align*}
+\vspace{0.2em}
+\begin{block}{教学阈值}
+本周 notebook 用 $0.95\le V\le1.05$, line loading $\le100\%$, VUF $\le2\%$ 作为演示阈值。论文中需要说明阈值来源。
+\end{block}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\section{三相物理基础}
+
+\begin{frame}{三相电压: line-to-line 与 line-to-neutral}
+\begin{columns}[T]
+\column{0.52\textwidth}
+低压三相系统常用:
+\begin{itemize}
+  \item $V_{LL}$: 线电压, 例如 0.4 kV;
+  \item $V_{LN}$: 相电压, 约 $0.4/\sqrt{3}$ kV;
+  \item pandapower bus 的 \code{vn\_kv} 对 LV feeder 通常表示 nominal line-to-line voltage;
+  \item 三相结果表中的 $vm_{a/b/c}$ 是 per-unit 相电压幅值。
+\end{itemize}
+\column{0.42\textwidth}
+\begin{block}{电流复核常用关系}
+\[
+|I_{\phi}|=\frac{|S_{\phi}|}{|V_{LN,\phi}|}
+\]
+\[
+V_{LN,base}=\frac{V_{LL,base}}{\sqrt{3}}
+\]
+\end{block}
+\end{columns}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{相量表示}
+每一相电压可以写成复数相量:
+\[
+V_a = |V_a|e^{j\theta_a},\quad
+V_b = |V_b|e^{j\theta_b},\quad
+V_c = |V_c|e^{j\theta_c}
+\]
+\vspace{0.3em}
+平衡三相系统中:
+\[
+|V_a|=|V_b|=|V_c|,\quad
+\theta_b\approx\theta_a-120^\circ,\quad
+\theta_c\approx\theta_a+120^\circ
+\]
+\vspace{0.3em}
+不平衡系统中, 幅值和相角都可能偏离上述关系。
+\begin{alertblock}{AI 特征提示}
+只用三相平均电压会丢掉相别风险; phase-aware AI 应保留 A/B/C 通道。
+\end{alertblock}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{对称分量: 从 ABC 到 012}
+定义:
+\[
+a=e^{j2\pi/3}
+\]
+\[
+\begin{bmatrix}
+V^{(0)} \\
+V^{(1)} \\
+V^{(2)}
+\end{bmatrix}
+=
+\frac{1}{3}
+\begin{bmatrix}
+1 & 1 & 1 \\
+1 & a & a^2 \\
+1 & a^2 & a
+\end{bmatrix}
+\begin{bmatrix}
+V_a \\
+V_b \\
+V_c
+\end{bmatrix}
+\]
+\begin{itemize}
+  \item $V^{(1)}$: 正序, 正常三相供电的主要分量;
+  \item $V^{(2)}$: 负序, 衡量不平衡程度;
+  \item $V^{(0)}$: 零序, 与接地回路和中性线相关。
+\end{itemize}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{VUF: Voltage Unbalance Factor}
+\[
+\mathrm{VUF}=100\frac{|V^{(2)}|}{|V^{(1)}|}
+\]
+\vspace{0.5em}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{为什么需要 VUF?}
+\begin{itemize}
+  \item 电压幅值都在 0.95-1.05 内, 仍可能存在较强相间不平衡;
+  \item inverter, motor, protection settings 都可能受负序分量影响;
+  \item VUF 是后续 security label 的重要组成。
+\end{itemize}
+\end{block}
+\column{0.46\textwidth}
+\begin{alertblock}{Notebook proof}
+从 \code{res\_bus\_3ph} 的 A/B/C 电压幅值和角度手算 VUF, 与 \code{unbalance\_percent} 比较。
+\end{alertblock}
+\end{columns}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{逐相功率和符号约定}
+\begin{tabular}{p{0.25\textwidth}p{0.32\textwidth}p{0.34\textwidth}}
+\toprule
+元素 & pandapower 表 & 本周解释 \\
+\midrule
+逐相负荷 & \code{asymmetric\_load} & 负荷采用 consumer convention, 正 $P$ 表示消耗 \\
+逐相 DER/PV & \code{asymmetric\_sgen} & 正 $P$ 表示发电注入 \\
+PCC/slack & \code{ext\_grid} & 结果表中正 $P$ 通常表示外部电网向系统供电 \\
+线路损耗 & \code{res\_line\_3ph} & 每相 $pl_\phi$, $ql_\phi$ 可用于功率平衡验证 \\
+\bottomrule
+\end{tabular}
+\vspace{0.8em}
+\begin{block}{逐相有功平衡}
+\[
+P_{grid,\phi}+P_{sgen,\phi}-P_{load,\phi}-P_{loss,\phi}\approx 0
+\]
+\end{block}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\section{pandapower 三相建模}
+
+\begin{frame}{\texttt{runpp\_3ph()} 的基本思想}
+\begin{columns}[T]
+\column{0.50\textwidth}
+\code{runpp\_3ph()} 用于 unbalanced/asymmetric/three-phase load flow。
+\begin{itemize}
+  \item 使用 sequence-frame 建模;
+  \item 正序网络使用 Newton-Raphson;
+  \item 零序和负序网络使用 current injection 思路;
+  \item 三相结果会写入 \code{res\_*\_3ph} 表。
+\end{itemize}
+\column{0.44\textwidth}
+\begin{block}{课程使用方式}
+\begin{enumerate}
+  \item 建立包含零序参数的 feeder;
+  \item 添加逐相负荷和逐相 PV;
+  \item 运行 \code{pp.runpp\_3ph(net)};
+  \item 对结果做物理 proof。
+\end{enumerate}
+\end{block}
+\end{columns}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{线路参数: 为什么需要 zero-sequence?}
+三相潮流不能只给正序线路参数。对 line, 本周需要:
+\begin{itemize}
+  \item 正序/负序: \code{r\_ohm\_per\_km}, \code{x\_ohm\_per\_km}, \code{c\_nf\_per\_km};
+  \item 零序: \code{r0\_ohm\_per\_km}, \code{x0\_ohm\_per\_km}, \code{c0\_nf\_per\_km};
+  \item 热限值: \code{max\_i\_ka};
+  \item 长度: \code{length\_km} 必须大于 0。
+\end{itemize}
+\begin{alertblock}{常见错误}
+只复制 Week 1 的 \code{create\_line\_from\_parameters()} 而不加 zero-sequence 参数, 三相潮流会缺少关键物理信息。
+\end{alertblock}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}[fragile]{三相 feeder 的核心建模代码}
+\begin{lstlisting}
+net = pp.create_empty_network(sn_mva=1.0)
+b0 = pp.create_bus(net, vn_kv=0.4, name="PCC")
+b1 = pp.create_bus(net, vn_kv=0.4, name="Bus 1")
+
+pp.create_ext_grid(net, bus=b0, vm_pu=1.0,
+                   s_sc_max_mva=10, s_sc_min_mva=8,
+                   rx_max=0.1, rx_min=0.1,
+                   x0x_max=1.0, x0x_min=1.0,
+                   r0x0_max=0.1, r0x0_min=0.1)
+
+pp.create_line_from_parameters(
+    net, from_bus=b0, to_bus=b1, length_km=0.08,
+    r_ohm_per_km=0.642, x_ohm_per_km=0.083,
+    c_nf_per_km=210, max_i_ka=0.20,
+    r0_ohm_per_km=1.80, x0_ohm_per_km=0.25,
+    c0_nf_per_km=70)
+\end{lstlisting}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}[fragile]{逐相负荷与逐相 PV}
+\begin{lstlisting}
+pp.create_asymmetric_load(
+    net, bus=b1,
+    p_a_mw=0.010, p_b_mw=0.008, p_c_mw=0.006,
+    q_a_mvar=0.0020, q_b_mvar=0.0016, q_c_mvar=0.0012,
+    type="wye", name="unbalanced_load")
+
+pp.create_asymmetric_sgen(
+    net, bus=b1,
+    p_a_mw=0.003, p_b_mw=0.000, p_c_mw=0.002,
+    q_a_mvar=0.0, q_b_mvar=0.0, q_c_mvar=0.0,
+    type="wye", name="phase_specific_PV")
+\end{lstlisting}
+\begin{block}{讲课强调}
+负荷和发电不要用“负负荷”混着写。负荷用 \code{asymmetric\_load}, PV/DER 用 \code{asymmetric\_sgen}。
+\end{block}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{Week 2 教学 feeder}
+\centering
+\begin{tikzpicture}[node distance=1.0cm and 1.3cm, every node/.style={font=\scriptsize}]
+\tikzset{bus/.style={draw, circle, fill=blue!8, minimum size=0.8cm}}
+\tikzset{load/.style={draw, rounded corners, fill=orange!12, align=center, minimum width=1.65cm}}
+\tikzset{pv/.style={draw, rounded corners, fill=green!12, align=center, minimum width=1.65cm}}
+\tikzset{arrow/.style={-{Latex[length=2mm]}, thick}}
+\node[bus] (b0) {PCC};
+\node[bus, right=of b0] (b1) {Bus 1};
+\node[bus, right=of b1] (b2) {Bus 2};
+\draw[thick] (b0) -- node[above]{Line 0} (b1);
+\draw[thick] (b1) -- node[above]{Line 1} (b2);
+\node[load, below=0.75cm of b1] (l1) {A/B/C 负荷\\轻度不平衡};
+\node[load, below=0.75cm of b2] (l2) {B 相较重\\末端负荷};
+\node[pv, above=0.75cm of b2] (pv) {A/C 相 PV\\逐相注入};
+\draw[arrow] (l1) -- (b1);
+\draw[arrow] (l2) -- (b2);
+\draw[arrow] (pv) -- (b2);
+\end{tikzpicture}
+\vspace{0.6em}
+\begin{block}{为什么网络很小?}
+小网络适合逐项 proof。等学生会验证后, Week 3 再切到更大 feeder 和场景生成。
+\end{block}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}[fragile]{运行三相潮流}
+\begin{lstlisting}
+pp.runpp_3ph(
+    net,
+    calculate_voltage_angles=True,
+    init="auto",
+    max_iteration=50,
+    tolerance_mva=1e-8,
+)
+\end{lstlisting}
+\vspace{0.5em}
+运行后重点查看:
+\begin{itemize}
+  \item \code{net.converged};
+  \item \code{net.res\_bus\_3ph};
+  \item \code{net.res\_line\_3ph};
+  \item \code{net.res\_ext\_grid\_3ph};
+  \item \code{net.res\_asymmetric\_load\_3ph};
+  \item \code{net.res\_asymmetric\_sgen\_3ph}。
+\end{itemize}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{三相结果表怎么读?}
+\begin{tabular}{p{0.30\textwidth}p{0.62\textwidth}}
+\toprule
+结果表 & 课堂重点 \\
+\midrule
+\code{res\_bus\_3ph} & 每个 bus 的 \code{vm\_a/b/c\_pu}, \code{va\_a/b/c\_degree}, \code{unbalance\_percent} \\
+\code{res\_line\_3ph} & 每条 line 的逐相 P/Q, current, loading, loss \\
+\code{res\_ext\_grid\_3ph} & PCC 各相注入 P/Q, 用于功率平衡 \\
+\code{res\_asymmetric\_load\_3ph} & 逐相负荷实际 P/Q \\
+\code{res\_asymmetric\_sgen\_3ph} & 逐相 DER/PV 实际 P/Q \\
+\bottomrule
+\end{tabular}
+\vspace{0.8em}
+\begin{alertblock}{不要只看总量}
+三相安全预测中, 最危险的经常是某一相, 不是三相平均值。
+\end{alertblock}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\section{Proof 与交叉验证}
+
+\begin{frame}{为什么 notebook 必须做 proof?}
+\begin{columns}[T]
+\column{0.52\textwidth}
+科研代码常见问题:
+\begin{itemize}
+  \item 负荷和发电符号写反;
+  \item kV 和 pu 的基准混淆;
+  \item line-to-line 与 line-to-neutral 混淆;
+  \item 只检查总功率, 没有逐相检查;
+  \item 模型训练前标签就已经错了。
+\end{itemize}
+\column{0.42\textwidth}
+\begin{block}{本周 proof 列表}
+\begin{enumerate}
+  \item 输入结构检查;
+  \item VUF 手算复核;
+  \item 逐相 P/Q 功率平衡;
+  \item $S=VI^*$ 电流复核;
+  \item loading percent 复核;
+  \item balanced runpp 交叉验证。
+\end{enumerate}
+\end{block}
+\end{columns}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{Proof 0: 输入结构检查}
+运行潮流前检查:
+\begin{itemize}
+  \item 只有一个 PCC/slack;
+  \item 所有 element 的 bus index 都存在;
+  \item line 参数长度和电流限值为正;
+  \item line 包含 zero-sequence 参数;
+  \item \code{asymmetric\_load} 和 \code{asymmetric\_sgen} 包含 A/B/C 的 P/Q 列;
+  \item \code{ext\_grid} 包含三相潮流需要的短路/序参数字段。
+\end{itemize}
+\begin{block}{教学目的}
+先让输入数据“可被证明为合理”, 再讨论潮流输出。
+\end{block}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{Proof 1: VUF 手算复核}
+从 \code{res\_bus\_3ph} 构造相量:
+\[
+V_\phi = vm_\phi e^{j\theta_\phi}
+\]
+再用对称分量矩阵得到:
+\[
+V^{(1)},\quad V^{(2)}
+\]
+最后比较:
+\[
+100\frac{|V^{(2)}|}{|V^{(1)}|}
+\quad \text{vs.}\quad
+\code{unbalance\_percent}
+\]
+\begin{alertblock}{断言}
+Notebook 中若最大误差超过容差, 自动抛出 \code{AssertionError}。
+\end{alertblock}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{Proof 2: 逐相功率平衡}
+每一相分别验证:
+\[
+P_{grid,\phi}+P_{sgen,\phi}-P_{load,\phi}-P_{loss,\phi}\approx 0
+\]
+\[
+Q_{grid,\phi}+Q_{sgen,\phi}-Q_{load,\phi}-Q_{loss,\phi}\approx 0
+\]
+\vspace{0.5em}
+\begin{block}{为什么不是只看三相总功率?}
+三相总功率平衡并不能证明逐相建模正确。相别交换、某一相符号错误, 都可能被总量掩盖。
+\end{block}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{Proof 3: 从 $S=VI^*$ 复核相电流}
+对线路每一端、每一相:
+\[
+S_{\phi}=P_{\phi}+jQ_{\phi}=V_{\phi}I_{\phi}^{*}
+\]
+\[
+|I_{\phi}|=\frac{|S_{\phi}|}{|V_{LN,\phi}|}
+\]
+单位上:
+\[
+\frac{\mathrm{MVA}}{\mathrm{kV}}=\mathrm{kA}
+\]
+\begin{alertblock}{关键换算}
+\[
+V_{LN,base}=\frac{V_{LL,base}}{\sqrt{3}}
+\]
+\end{alertblock}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{Proof 4: 复核 line loading}
+每相 loading:
+\[
+loading_{\ell,\phi}=100\frac{|I_{\ell,\phi}|}{I_\ell^{max}}
+\]
+线路总 loading:
+\[
+loading_\ell=\max_{\phi\in\{a,b,c\}}loading_{\ell,\phi}
+\]
+\vspace{0.5em}
+\begin{block}{为什么这很重要?}
+后续 thermal violation label 直接来自 loading。如果 loading 的定义没搞清楚, AI 学到的标签就没有物理可信度。
+\end{block}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{Cross-validation: 平衡 case 的双求解器/双模型复核}
+构造一个三相完全平衡的 case:
+\begin{itemize}
+  \item A/B/C 负荷相同;
+  \item A/B/C PV 相同;
+  \item 网络参数保持一致。
+\end{itemize}
+\vspace{0.3em}
+然后比较:
+\begin{itemize}
+  \item \code{runpp\_3ph()} 的三相平均 bus voltage;
+  \item \code{runpp()} 的 balanced bus voltage;
+  \item \code{runpp\_3ph()} 的 line loading;
+  \item \code{runpp()} 的 line loading。
+\end{itemize}
+\begin{alertblock}{预期结果}
+误差应接近数值容差; 三相电压 spread 应接近 0。
+\end{alertblock}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\section{场景实验}
+
+\begin{frame}{Week 2 场景实验}
+\begin{tabular}{p{0.24\textwidth}p{0.62\textwidth}}
+\toprule
+场景 & 目的 \\
+\midrule
+\code{base} & 基准不平衡场景 \\
+\code{high\_load} & 检查负荷升高是否导致电压下降 \\
+\code{phase\_b\_heavy\_load} & 检查 B 相重载是否导致 B 相更低电压和更大 VUF \\
+\code{single\_phase\_pv\_a} & 检查 A 相 PV 增大是否降低 PCC 进口并改变电压 \\
+\code{stress\_unbalance} & 观察强不平衡下的 VUF 和相电压风险 \\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{场景 sanity checks}
+Notebook 会自动检查:
+\begin{enumerate}
+  \item \code{high\_load} 的最小电压低于 \code{base};
+  \item \code{single\_phase\_pv\_a} 的 PCC 有功进口低于 \code{base};
+  \item \code{stress\_unbalance} 的最大 VUF 高于 \code{base};
+  \item \code{phase\_b\_heavy\_load} 的 B 相最低电压低于 \code{base}。
+\end{enumerate}
+\vspace{0.6em}
+\begin{block}{为什么叫 sanity check?}
+它不能代替严格验证, 但可以快速发现最常见的符号、缩放、相别映射错误。
+\end{block}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{三相安全 summary: 后续标签的雏形}
+每个场景导出:
+\begin{itemize}
+  \item \code{min\_vm\_a/b/c\_pu};
+  \item \code{min\_vm\_all\_pu};
+  \item \code{max\_vm\_all\_pu};
+  \item \code{max\_unbalance\_percent};
+  \item \code{max\_loading\_a/b/c\_percent};
+  \item \code{max\_loading\_percent};
+  \item \code{p\_grid\_total\_mw};
+  \item \code{voltage/loading/unbalance\_violation}。
+\end{itemize}
+\begin{alertblock}{Week 4 扩展}
+把 summary 从 base-case 扩展到每个 $(scenario, contingency)$, 就得到 N-1 label dataset。
+\end{alertblock}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{从三相潮流到 AI 特征}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Node features}
+\begin{itemize}
+  \item $P_{load,a/b/c}, Q_{load,a/b/c}$;
+  \item $P_{PV,a/b/c}, Q_{PV,a/b/c}$;
+  \item $V_{a/b/c}$, $\theta_{a/b/c}$;
+  \item VUF, voltage margin。
+\end{itemize}
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Edge/global features}
+\begin{itemize}
+  \item line $r,x,r_0,x_0$, length, $I^{max}$;
+  \item base-case current/loading by phase;
+  \item scenario type;
+  \item PCC/grid-connected indicator;
+  \item future contingency mask。
+\end{itemize}
+\end{block}
+\end{columns}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{课堂 Notebook 结构}
+\begin{enumerate}
+  \item Setup 和教学阈值;
+  \item 构建三相教学 feeder;
+  \item 输入网络 proof;
+  \item 运行 \code{runpp\_3ph()};
+  \item 结果表结构检查;
+  \item VUF 手算复核;
+  \item 逐相 P/Q 平衡复核;
+  \item $S=VI^*$ 电流复核;
+  \item line loading 复核;
+  \item balanced \code{runpp()} vs \code{runpp\_3ph()} 交叉验证;
+  \item 多场景 sanity checks;
+  \item 导出 Week 2 summary。
+\end{enumerate}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{学生本周输出}
+\begin{itemize}
+  \item 一个可运行的三相不平衡潮流 notebook;
+  \item 一张 base-case 三相电压图;
+  \item 一张 base-case 三相 line loading 图;
+  \item 一张 VUF 图;
+  \item 一个 \code{week2\_scenario\_security\_summary.csv};
+  \item 一段文字解释: 为什么三相平均量不足以做微电网安全预测;
+  \item 完成 2-3 个 exercises。
+\end{itemize}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{学生练习}
+\begin{block}{Exercise 1: 健康 base case}
+修改负荷或线路长度, 使 \code{min\_vm\_all\_pu > 0.97} 且 \code{max\_unbalance\_percent < 1.0}。
+\end{block}
+\begin{block}{Exercise 2: 制造电压越限}
+修改 stress scenario, 让某一相电压低于 0.90 pu, 但潮流仍收敛。
+\end{block}
+\begin{block}{Exercise 3: 单相 PV 思考}
+增大 A 相 PV 后, 为什么 B/C 相电压也可能变化?
+\end{block}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{过渡到 Week 3}
+Week 3 会把本周小 feeder 扩展为 scenario generation pipeline:
+\begin{itemize}
+  \item 加入更多 buses/loads/PV/BESS;
+  \item 生成 high PV, evening peak, EV charging, BESS charging/discharging 等场景;
+  \item 保存 base-case 三相特征;
+  \item 训练前先做数据质量检查;
+  \item 为 Week 4 的 N-1 扫描准备候选 contingencies。
+\end{itemize}
+\vspace{0.6em}
+\begin{alertblock}{课程主线}
+每周都要保留 proof/cross-validation, 不要让数据生成变成不可解释的脚本。
+\end{alertblock}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{参考资料}
+\small
+\begin{itemize}
+  \item pandapower documentation, \emph{Asymmetric / Three Phase Power Flow}, \url{https://pandapower.readthedocs.io/en/stable/powerflow/ac_3ph.html}
+  \item pandapower documentation, \emph{Asymmetric Load}, \url{https://pandapower.readthedocs.io/en/stable/elements/asymmetric_load.html}
+  \item pandapower documentation, \emph{Asymmetric Static Generator}, \url{https://pandapower.readthedocs.io/en/stable/elements/asymmetric_sgen.html}
+  \item pandapower documentation, \emph{Line}, \url{https://pandapower.readthedocs.io/en/stable/elements/line.html}
+\end{itemize}
+\vspace{0.5em}
+\begin{block}{建议阅读方式}
+先跑通 notebook, 再回头查文档中的符号约定和结果表定义。
+\end{block}
+\end{frame}
+
+\end{document}

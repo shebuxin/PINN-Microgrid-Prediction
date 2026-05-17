@@ -1,0 +1,82 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{url}
+
+\title{Physics-informed AI for Fast Three-phase N-1 Security Screening in Unbalanced Microgrids}
+\author{Student Name, Advisor Name}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This mini-paper studies fast static N-1 security screening for unbalanced microgrids. A pandapower-based three-phase power-flow pipeline is used to generate post-contingency labels under voltage, loading, voltage-unbalance, service-loss, and convergence criteria. Several screening models are compared, including traditional ML baselines, a physics-informed multi-task MLP, and a phase-aware GNN. The goal is not to replace three-phase power flow, but to prioritize high-risk contingencies while maintaining high recall.
+\end{abstract}
+
+\section{Introduction}
+Unbalanced microgrids and low-voltage feeders can experience phase-specific voltage, current, and unbalance violations under component outages. Exhaustive three-phase N-1 scans are accurate but expensive when many operating scenarios and contingencies must be assessed. This work evaluates AI-based pre-screening models for fast high-recall contingency prioritization.
+
+\textbf{Contributions:}
+\begin{itemize}
+    \item A reproducible three-phase N-1 labeling workflow for microgrid security screening.
+    \item A phase-aware violation definition including voltage, loading, VUF, service-loss, and non-convergence labels.
+    \item A comparison of engineering rules, ML baselines, PI-MLP, and phase-aware GNN models under high-recall screening metrics.
+    \item A validation suite for dataset lineage, no-leakage feature design, metric consistency, and graph invariance checks.
+\end{itemize}
+
+\section{Three-phase Microgrid Security Formulation}
+For each base-case scenario $x_t$ and contingency $c\in\mathcal{C}$, the target is a binary label $y_{t,c}$ and severity score $s_{t,c}$. The post-contingency quantities include phase voltages $V_{i,\phi}^{c}$, line currents $I_{\ell,\phi}^{c}$, and voltage unbalance factors.
+
+\subsection{Violation Labels}
+The final label is the logical OR of low-voltage, high-voltage, loading, VUF, service-loss, critical service-loss, and non-convergence flags.
+
+\section{Dataset Generation}
+The dataset is generated using a microgrid-like teaching feeder. Scenario generation controls load level, phase imbalance, PV penetration, and BESS charging/discharging setpoints. Each scenario is combined with a contingency catalog including line outages, PV trips, BESS trip, and PCC outage.
+
+\input{tables/table1_dataset_statistics.tex}
+
+\section{Screening Models}
+\subsection{Traditional ML Baselines}
+Engineering rules, logistic regression, random forest, gradient boosting, and MLP baselines are trained using no-leakage base-case features.
+
+\subsection{Physics-informed MLP}
+The PI-MLP predicts a violation probability, severity score, and component margins. The loss combines classification, severity, component-margin, consistency, and ranking losses.
+
+\subsection{Phase-aware GNN}
+The GNN uses bus-level phase-channel node features, line edge features, and contingency masks to produce a graph-level risk score.
+
+\section{Experiments}
+\input{tables/table2_model_comparison.tex}
+\input{tables/table3_group_cv.tex}
+\input{tables/table4_loss_ablation.tex}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.95\linewidth]{figures/fig3_week6_precision_recall_curves.png}
+    \caption{Precision-recall curves for screening models.}
+    \label{fig:pr}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.95\linewidth]{figures/fig4_week6_saved_calls_vs_missed_violations.png}
+    \caption{Tradeoff between saved three-phase power-flow calls and missed violations.}
+    \label{fig:saved_calls}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.95\linewidth]{figures/fig5_week7_topk_violation_recall.png}
+    \caption{Top-$k$ violation recall for contingency prioritization.}
+    \label{fig:topk}
+\end{figure}
+
+\section{Discussion and Limitations}
+The current benchmark is intentionally small and teaching-oriented. It supports methodological development and validation logic, but broader claims require additional feeders, stochastic scenarios, islanded-mode modeling, grid-forming inverter models, and real microgrid data.
+
+\section{Conclusion}
+This project demonstrates a reproducible workflow for three-phase microgrid N-1 security screening with AI. The main lesson is that high-recall screening, validation discipline, and no-leakage feature design are as important as model architecture.
+
+\end{document}

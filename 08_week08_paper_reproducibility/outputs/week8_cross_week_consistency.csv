@@ -1,0 +1,6 @@
+check,passed,detail
+scenario_ids_align,True,n=7
+contingency_ids_align,True,n=11
+base_features_subset_of_scenarios,True,n_base=7
+ai_ready_same_rows_as_n1,True,77 vs 77
+label_distribution_has_both_classes,True,"{True: 47, False: 30}"
