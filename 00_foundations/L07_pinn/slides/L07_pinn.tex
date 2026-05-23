@@ -7,15 +7,39 @@
 
 \usepackage{amsmath,amssymb,booktabs,array}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc,decorations.pathreplacing}
+\usepackage{listings}
 \usepackage{xcolor}
 \usepackage{hyperref}
 
+\definecolor{codebg}{RGB}{248,248,248}
 \definecolor{darkblue}{RGB}{0,65,120}
+\definecolor{darkgreen}{RGB}{0,105,70}
+\definecolor{warnorange}{RGB}{190,110,0}
+\definecolor{darkred}{RGB}{160,30,30}
+\definecolor{safecol}{RGB}{40,140,60}
+\definecolor{unsafecol}{RGB}{200,40,40}
+
 \hypersetup{colorlinks=true,linkcolor=darkblue,urlcolor=darkblue}
 
+\lstdefinestyle{pythonstyle}{
+    language=Python,
+    basicstyle=\ttfamily\scriptsize,
+    keywordstyle=\color{darkblue}\bfseries,
+    commentstyle=\color{darkgreen},
+    stringstyle=\color{warnorange},
+    showstringspaces=false,
+    columns=fullflexible,
+    backgroundcolor=\color{codebg},
+    frame=single,
+    rulecolor=\color{black!15},
+    breaklines=true
+}
+\lstset{style=pythonstyle}
+
 \newcommand{\code}[1]{\texttt{#1}}
-\newcommand{\TODO}[1]{\textcolor{red}{\textbf{TODO:}} \emph{#1}}
+\newcommand{\checkitem}{\textcolor{darkgreen}{\Large$\checkmark$}\;}
+\newcommand{\warnitem}{\textcolor{warnorange}{\Large$\triangle$}\;}
 
 \title[L07: PINN]{L07 -- Physics-informed Neural Networks (PINN)}
 \subtitle{Foundations Lecture Series}
@@ -25,114 +49,561 @@
 
 \begin{document}
 
+% ============================================================
 \begin{frame}
   \titlepage
+  \vspace{-0.8em}
   \begin{center}
-    \small Keywords: physics-informed loss, soft constraints, limit-aware learning, Raissi 2019
+    \small Keywords: physics in the loss, soft constraints, limit-aware learning, multi-task, project's PI-MLP
   \end{center}
 \end{frame}
 
 % ============================================================
 \begin{frame}{Lecture roadmap}
 \begin{enumerate}
-  \item The PINN idea -- physics as a soft constraint
-  \item Loss design: data + physics
-  \item Strict vs soft constraints
-  \item Limit-aware learning -- the project's flavor
-  \item When PINNs help and when they don't
-  \item Connection to the project's Week 6 PI-MLP
+  \item Where PINNs come from -- the Raissi 2019 lineage
+  \item Loss design: data + physics + a knob $\lambda$
+  \item Soft vs strict constraints, and what the project uses
+  \item Limit-aware learning -- the project's specific flavor
+  \item Worked example: regularizing an MLP with safety rules
+  \item When PINNs help and when they hurt
+  \item Reading the project's PI-MLP composite loss
 \end{enumerate}
 \vspace{0.6em}
 \begin{block}{Prerequisite}
-L05 (MLPs, loss design, PyTorch). Helpful: L01--L04 for the physics being constrained.
+L05 (MLP loss design, PyTorch). Helpful: L01--L04 for the physical constraints we will use, and L06 for the GNN angle.
 \end{block}
 \end{frame}
 
 % ============================================================
-\section*{1. The PINN idea}
+\section*{1. Where PINNs come from}
 
-\begin{frame}{Where PINNs come from}
-\TODO{Briefly trace the lineage from prior physics-based ML to Raissi-Perdikaris-Karniadakis 2019. State the central idea: encode the known PDE/ODE/algebraic constraint into the loss function so the model is penalized for violating physics, not just for fitting data poorly.}
+\begin{frame}{The Raissi 2019 idea, in one slide}
+\textbf{Classical setting:} solve a partial differential equation
+\begin{equation*}
+\mathcal{N}[u](x, t) = 0, \qquad u(x, 0) = u_0(x), \qquad u(x, t)|_{\partial \Omega} = g
+\end{equation*}
+by training a neural net $u_\theta(x,t)$ with the loss
+\begin{equation*}
+\boxed{\;\mathcal{L} \;=\; \underbrace{\tfrac{1}{N_d}\sum_i \|u_\theta(x_i, t_i) - u_i\|^2}_{\text{data fit}} \;+\; \lambda \cdot \underbrace{\tfrac{1}{N_c}\sum_j \|\mathcal{N}[u_\theta](x_j, t_j)\|^2}_{\text{physics residual at collocation points}}\;}
+\end{equation*}
+\vspace{0.2em}
+\begin{itemize}
+  \item Data points $x_i, t_i$ where we measure $u$ -- typically few.
+  \item Collocation points $x_j, t_j$ where the PDE \emph{should} hold -- can be cheap to sample on a grid.
+  \item Net learns to fit data \emph{and} respect the equation.
+\end{itemize}
+\vspace{0.3em}
+\begin{block}{Why this is powerful}
+The physics term gives the model a strong inductive prior. It often extrapolates outside the data region in a way a pure data-fit net cannot.
+\end{block}
 \end{frame}
 
-\begin{frame}{Why bother with physics in the loss}
-\TODO{Three reasons: (1) extrapolation beyond the training distribution, (2) data efficiency, (3) interpretability. Concrete example from microgrid security: a model that respects voltage limits ``for free'' is more trustworthy than one that learns them from data alone.}
+% ============================================================
+\begin{frame}{Three reasons to put physics in the loss}
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{1. Sample efficiency}
+\begin{itemize}
+  \item PDE residual is a ``free supervisor'' anywhere we can evaluate it.
+  \item Useful when labeled data is expensive (e.g.\ instrumentation, expert labels).
+\end{itemize}
+\vspace{0.4em}
+\textbf{2. Extrapolation}
+\begin{itemize}
+  \item A plain net is reliable only where it has data.
+  \item Physics terms constrain the model in unmeasured regions.
+\end{itemize}
+\column{0.5\textwidth}
+\textbf{3. Trustworthiness}
+\begin{itemize}
+  \item Hard for a non-expert to audit a black-box prediction.
+  \item Easier to defend a model that ``never violates Ohm's law'' or ``always respects voltage limits''.
+\end{itemize}
+\vspace{0.4em}
+\begin{alertblock}{For safety screening}
+Reasons 1 and 3 dominate. The project has only 77 labeled samples (data is expensive) and is for a safety-critical task (auditability matters). Both push toward physics-informed methods.
+\end{alertblock}
+\end{columns}
 \end{frame}
 
 % ============================================================
 \section*{2. Loss design}
 
-\begin{frame}{Data loss + physics loss}
-\TODO{Write $\mathcal{L} = \mathcal{L}_{\text{data}} + \lambda \mathcal{L}_{\text{phys}}$. Explain that $\mathcal{L}_{\text{phys}}$ is typically the squared residual of a physical equation evaluated at the model's prediction. Discuss the role and sensitivity of $\lambda$.}
-\end{frame}
-
-\begin{frame}{Multi-task framing}
-\TODO{Many PINNs in power systems are really multi-task: classification + regression + ranking + limit penalty. Show the project's Week 6 PI-MLP composite loss as a concrete example.}
-\end{frame}
-
-\begin{frame}{Choosing physics terms}
-\TODO{Concrete physics terms relevant to this project: voltage limit penalty, current limit penalty, VUF penalty, power-balance residual, sequence-component consistency. Note that not all of these are strict PINN-style PDE residuals -- some are just engineering limits.}
+\begin{frame}{The general data + physics decomposition}
+\begin{equation*}
+\boxed{\;\mathcal{L}_{\text{total}} \;=\; \mathcal{L}_{\text{data}} \;+\; \lambda \cdot \mathcal{L}_{\text{phys}}\;}
+\end{equation*}
+\vspace{0.2em}
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{Data loss}
+\begin{itemize}
+  \item BCE for classification.
+  \item MSE for regression.
+  \item Cross-entropy for multi-class.
+  \item Standard ML, evaluated on labeled training samples.
+\end{itemize}
+\column{0.5\textwidth}
+\textbf{Physics loss}
+\begin{itemize}
+  \item PDE residual (Raissi-style).
+  \item Engineering limit violation (project-style).
+  \item Conservation law residual.
+  \item Symmetry / invariance penalty.
+  \item Evaluated on \emph{any} points where physics is defined.
+\end{itemize}
+\end{columns}
+\vspace{0.5em}
+\begin{block}{Where physics points come from}
+For PDE problems: sample uniformly on the domain. For our project: random scenario--contingency pairs, or grid points in feature space. They do \emph{not} need labels; the physics rule provides the supervisory signal.
+\end{block}
 \end{frame}
 
 % ============================================================
-\section*{3. Strict vs soft constraints}
+\begin{frame}{The penalty coefficient $\lambda$}
+\centering
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+\draw[->, thick] (-0.2,0) -- (8.2,0) node[right]{$\lambda$};
+\draw[->, thick] (0,-0.3) -- (0,3.3) node[above]{performance};
+% Validation curve, peaks in middle
+\draw[thick, darkblue, smooth] plot coordinates {(0.2,0.8) (1,1.4) (2,2.2) (3,2.8) (4,3.0) (5,2.7) (6,2.2) (7,1.5) (8,0.8)};
+\node[darkblue] at (4, 3.3) {validation metric};
+\fill[darkred] (4, 3.0) circle (0.07);
+\draw[dashed, gray] (4, 0) -- (4, 3.0);
+\node[font=\tiny] at (4, -0.4) {sweet spot};
+\node[font=\tiny] at (1, -0.4) {data-only};
+\node[font=\tiny] at (7, -0.4) {physics-only};
+\end{tikzpicture}
+\vspace{0.4em}
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{Symptoms of bad $\lambda$}
+\begin{itemize}
+  \item Too small: physics has no effect; same as plain MLP.
+  \item Too large: model ignores data, predicts whatever satisfies physics.
+  \item Just right: physics regularizes without dominating.
+\end{itemize}
+\column{0.5\textwidth}
+\textbf{Practical approach}
+\begin{itemize}
+  \item Start at $\lambda = 1$.
+  \item Sweep over $\{0.01, 0.1, 1, 10, 100\}$ on validation.
+  \item Pick the $\lambda$ that maximizes the target metric (recall, AUPRC, etc.).
+\end{itemize}
+\end{columns}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Multi-task framing}
+Many real PINNs are not just one data term + one physics term -- they are several losses summed:
+\begin{equation*}
+\mathcal{L}_{\text{total}} \;=\; \lambda_1 \mathcal{L}_{\text{cls}} \;+\; \lambda_2 \mathcal{L}_{\text{sev}} \;+\; \lambda_3 \mathcal{L}_{\text{limit}} \;+\; \lambda_4 \mathcal{L}_{\text{rank}} \;+\; \ldots
+\end{equation*}
+Each term enforces a different aspect of the desired behavior. The architecture often has multiple output heads sharing a backbone.
+\vspace{0.5em}
+\centering
+\begin{tikzpicture}[node distance=0.4cm and 0.8cm, every node/.style={font=\scriptsize}]
+\tikzset{box/.style={draw, rounded corners, align=center, minimum width=2.4cm, minimum height=0.7cm}}
+\tikzset{arr/.style={-{Latex[length=2mm]}, thick}}
+\node[box, fill=blue!12] (inp) {Input features};
+\node[box, fill=warnorange!18, right=of inp] (back) {Shared backbone\\(MLP / GNN)};
+\node[box, fill=darkgreen!18, above right=-0.5cm and of back] (h1) {Class head};
+\node[box, fill=darkgreen!18, right=of back]   (h2) {Severity head};
+\node[box, fill=darkgreen!18, below right=-0.5cm and of back] (h3) {Margin head};
+\draw[arr] (inp)--(back);
+\draw[arr] (back)--(h1);
+\draw[arr] (back)--(h2);
+\draw[arr] (back)--(h3);
+\end{tikzpicture}
+\vspace{0.4em}
+\begin{block}{This is exactly the project's Week 6 PI-MLP}
+The shared layers extract a common representation. Each head outputs a different quantity. Each loss term penalizes a different mistake. The $\lambda_k$ values are tuned on validation.
+\end{block}
+\end{frame}
+
+% ============================================================
+\section*{3. Soft vs strict constraints}
 
 \begin{frame}{Soft constraints (the usual PINN)}
-\TODO{Add a penalty to the loss. Model can still violate the constraint; the penalty just makes that costly. Easy to implement, gradient-friendly. The default approach.}
-\end{frame}
-
-\begin{frame}{Strict constraints (projection / hard layer)}
-\TODO{Project the output onto the feasible set, or build a network architecture that cannot violate the constraint by construction. Harder to design, often necessary for safety-critical applications.}
-\end{frame}
-
-\begin{frame}{Which one for screening?}
-\TODO{For pre-screening (the project's framing), soft constraints are usually fine -- we still re-run the simulator on flagged contingencies. For deployment without simulator backup, you would want hard constraints or conformal prediction.}
+A soft constraint is just a penalty term:
+\begin{equation*}
+\mathcal{L}_{\text{phys}} \;=\; \tfrac{1}{N_c} \sum_j \|\, \text{constraint violation at }(x_j) \,\|^2
+\end{equation*}
+\vspace{0.2em}
+\textbf{Example (voltage limit):} we want the model to predict ``unsafe'' whenever $|V_a| < 0.95$. Define the penalty:
+\begin{equation*}
+\mathcal{L}_{\text{V-limit}} \;=\; \tfrac{1}{N_c} \sum_j \bigl[\, \mathbb{I}(V_j < 0.95) \cdot \max(0, \; 0.5 - \hat{y}_\theta(x_j))^2 \bigr]
+\end{equation*}
+Zero when the model already predicts $\hat{y} \geq 0.5$ (unsafe) on those points. Quadratic and positive otherwise.
+\vspace{0.4em}
+\begin{block}{Properties}
+\begin{itemize}
+  \item Easy to implement: just add a term to the loss.
+  \item Gradient-friendly: backprop works as usual.
+  \item Model \emph{can} still violate the constraint -- the penalty just makes it costly.
+\end{itemize}
+\end{block}
 \end{frame}
 
 % ============================================================
-\section*{4. Limit-aware learning}
-
-\begin{frame}{The project's flavor of physics-informed}
-\TODO{The project does \emph{not} encode the full AC power-flow residual into the loss. It uses ``limit-aware'' soft penalties: voltage limits, current limits, VUF threshold. This is a pragmatic subset of full PINN. Be honest with students about this.}
+\begin{frame}{Strict constraints (projection or architecture)}
+A strict constraint cannot be violated:
+\begin{itemize}
+  \item \textbf{Projection:} after the model's forward pass, project the prediction onto the feasible set. E.g., for power flow, clamp predicted voltages to a known band.
+  \item \textbf{Architecture:} design the network so its outputs structurally satisfy the constraint. E.g., output magnitudes via a softplus to guarantee positivity; output a distribution via softmax to guarantee summation to 1.
+  \item \textbf{Lagrangian / augmented:} explicit equality constraints with Lagrange multipliers, updated during training.
+\end{itemize}
+\vspace{0.5em}
+\begin{block}{Trade-offs}
+Strict constraints are necessary when violations are catastrophic and there's no downstream safety net. They are harder to design and may slow training. \textbf{For a screening model with a power-flow solver fallback, soft constraints are usually enough.}
+\end{block}
 \end{frame}
 
+% ============================================================
+\begin{frame}{Choosing for safety screening: soft is fine}
+\centering
+\begin{tikzpicture}[node distance=0.4cm and 0.8cm, every node/.style={font=\scriptsize}]
+\tikzset{box/.style={draw, rounded corners, align=center, minimum width=2.6cm, minimum height=0.9cm}}
+\tikzset{arr/.style={-{Latex[length=2.5mm]}, thick}}
+\node[box, fill=blue!12] (state) {Operating state};
+\node[box, fill=warnorange!18, right=of state] (model) {PI-MLP\\soft-constraint\\screening};
+\node[box, fill=darkred!18, right=of model] (pf) {\code{runpp\_3ph}\\authoritative};
+\node[box, fill=darkgreen!18, right=of pf] (out) {Final label};
+\draw[arr] (state)--(model);
+\draw[arr] (model)--node[above, font=\tiny]{high risk} (pf);
+\draw[arr] (pf)--(out);
+\draw[arr, dashed] (model.south)to[bend right=18]node[below, font=\tiny]{low risk: skip}(out.south);
+\end{tikzpicture}
+\vspace{0.5em}
+\begin{block}{Why soft constraints are sufficient here}
+The model is a \emph{pre-screener}. Anything it flags as suspicious is re-checked by the exact power-flow solver. So a small violation of the soft constraint at inference time does no harm -- the solver catches it. Strict constraints would matter only if we removed the solver fallback.
+\end{block}
+\begin{alertblock}{What changes for a deployed safety controller}
+If the model directly actuates an inverter or relay, we want hard constraints, conformal prediction, or formal verification. That's out of scope for screening but on the research roadmap.
+\end{alertblock}
+\end{frame}
+
+% ============================================================
+\section*{4. The project's limit-aware flavor}
+
+\begin{frame}{What ``physics-informed'' means in this project}
+The microgrid project does \emph{not} encode the full AC power-flow residual into the loss. Instead, it uses \textbf{five engineering-limit penalties}, each on a quantity that the simulator already gives us.
+\vspace{0.4em}
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+Term & Quantity & Penalty form \\
+\midrule
+$\mathcal{L}_{\text{V-lim}}$ & per-phase voltage $V_{i,\phi}$ vs $[0.95, 1.05]$ & $\max(0, V_{\min} - V)^2 + \max(0, V - V_{\max})^2$ \\
+$\mathcal{L}_{\text{I-lim}}$ & per-phase loading $\ell_\phi$ vs 100\% & $\max(0, \ell - 1.0)^2$ \\
+$\mathcal{L}_{\text{VUF}}$ & voltage unbalance vs 2\% & $\max(0, \text{VUF} - 0.02)^2$ \\
+$\mathcal{L}_{\text{cls}}$ & probability head $\hat{p}$ vs label & weighted BCE \\
+$\mathcal{L}_{\text{sev}}$ & severity head $\hat{s}$ vs severity score & MSE \\
+\bottomrule
+\end{tabular}
+\vspace{0.5em}
+\begin{alertblock}{Honest framing}
+This is \emph{limit-aware} learning rather than strict Raissi-PINN. The same name (``physics-informed'') has stretched to cover both. State which flavor you mean in your write-up so readers know what to expect.
+\end{alertblock}
+\end{frame}
+
+% ============================================================
 \begin{frame}{Severity regression as physics-informed}
-\TODO{Predicting not just label (safe / unsafe) but also severity is a form of physics-informed multi-task learning. The severity head learns continuous physical quantities, which can stabilize the classification head.}
-\end{frame}
-
-\begin{frame}{Ranking loss as physics-informed}
-\TODO{The project also adds a pairwise ranking loss: for top-k screening, the order of risk scores matters more than absolute probabilities. Frame this as another physics-aware multi-task component.}
-\end{frame}
-
-% ============================================================
-\section*{5. When PINNs help (and don't)}
-
-\begin{frame}{When PINNs help}
-\TODO{Sparse data, known physics, extrapolation, safety-critical applications. Mention published cases from fluid mechanics, biomechanics, and power systems.}
-\end{frame}
-
-\begin{frame}{When PINNs do not help (or hurt)}
-\TODO{Lots of data + well-tuned baseline. Wrong physics (e.g., a constraint that conflicts with the actual data-generating process). Overweighted penalty term. Poor optimization landscape from competing loss terms.}
-\end{frame}
-
-% ============================================================
-\section*{6. Connection to the project}
-
-\begin{frame}{What you will see in Week 6}
-\TODO{Show the high-level PI-MLP loss decomposition: BCE + severity MSE + component-margin + consistency + ranking. Promise to walk through each term. Forward-reference the ablation table from the paper.}
+Instead of only predicting a binary label, also predict a \emph{continuous severity score}:
+\begin{equation*}
+s = \max\!\left(\, \tfrac{0.95 - V_{\min}}{0.05},\; \tfrac{\ell_{\max} - 1.0}{0.5},\; \tfrac{\text{VUF} - 0.02}{0.02} \,\right) \cdot \mathbb{I}(\text{any limit crossed})
+\end{equation*}
+\vspace{0.2em}
+\begin{itemize}
+  \item Larger $s$ means worse violation; $s = 0$ means safe.
+  \item The severity head learns to predict $s$ via MSE loss.
+  \item The classification head and severity head share the backbone, so the two tasks help each other.
+\end{itemize}
+\vspace{0.4em}
+\begin{block}{Why this helps}
+A single binary label compresses a lot of information into one bit. Severity gives the network a much richer supervisory signal -- specifically a \emph{continuous physical quantity}. The classification head benefits from learning the severity geometry alongside.
+\end{block}
 \end{frame}
 
 % ============================================================
+\begin{frame}{Ranking loss for top-$k$ screening}
+For pre-screening, the \emph{order} of risk scores matters more than absolute probabilities. We may not have well-calibrated probabilities, but we want unsafe scenarios to be at the top of the queue.
+\vspace{0.4em}
+\begin{equation*}
+\mathcal{L}_{\text{rank}} \;=\; \tfrac{1}{|\mathcal{P}|} \sum_{(i, j) \in \mathcal{P}} \max\!\bigl(0, \;m - (\hat{y}_i - \hat{y}_j)\bigr)
+\end{equation*}
+where $\mathcal{P} = \{(i, j) : y_i = 1, y_j = 0\}$ is the set of (unsafe, safe) pairs and $m$ is a margin (e.g.\ $m=0.2$).
+\vspace{0.3em}
+\begin{itemize}
+  \item Pairwise hinge: penalizes pairs where the unsafe scenario has a \emph{lower} score than a safe one.
+  \item Pushes unsafe scores above safe scores by at least margin $m$.
+  \item Improves top-$k$ hit rate, which is the project's actual operational metric.
+\end{itemize}
+\vspace{0.3em}
+\begin{block}{Why this is ``physics-informed'' in spirit}
+The desired ordering (\emph{more dangerous on top}) is itself a physical property of the system, not just a statistical convenience. Encoding it explicitly is a form of inductive bias.
+\end{block}
+\end{frame}
+
+% ============================================================
+\section*{5. Worked example -- regularizing an MLP with safety rules}
+
+\begin{frame}{Toy problem: predict ``safe'' from $V$ and current loading $\ell$}
+\textbf{Ground-truth rule.} A state $(V, \ell)$ is \textbf{unsafe} iff $V < 0.95$ \emph{or} $\ell > 1.0$. Otherwise safe.\\[0.2em]
+\textbf{Training data.} Only 30 labeled scenarios, clustered near the boundary at $(V, \ell) \in [0.93, 1.02] \times [0.85, 1.05]$. \emph{No labels in the far corners.}
+\vspace{0.4em}
+\centering
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+\draw[->, thick] (-0.3,0) -- (5.5,0) node[right]{$V$};
+\draw[->, thick] (0,-0.3) -- (0,3.5) node[above]{$\ell$};
+% Axis tick labels
+\foreach \x/\v in {1/0.85, 2/0.90, 3/0.95, 4/1.00, 5/1.05} {
+  \draw (\x,-0.05)--(\x,0.05); \node[font=\tiny, below] at (\x,-0.05) {\v};
+}
+\foreach \y/\v in {1/0.85, 2/1.00, 3/1.15} {
+  \draw (-0.05,\y)--(0.05,\y); \node[font=\tiny, left] at (-0.05,\y) {\v};
+}
+% True boundary: safe region is V >= 0.95 (x >= 3) AND ell <= 1.0 (y <= 2)
+\fill[safecol!18] (3,0) rectangle (5.5,2);
+\node[safecol, font=\tiny] at (4.2, 1.0) {true safe};
+\node[unsafecol, font=\tiny] at (1.5, 1.0) {true unsafe ($V<0.95$)};
+\node[unsafecol, font=\tiny] at (4.0, 2.8) {true unsafe ($\ell>1.0$)};
+% Training data: cluster near boundary, both labels
+\foreach \pt in {(2.8,1.0), (3.1,0.9), (3.2,1.8), (2.9,1.4), (3.3,2.0), (3.1,1.6), (2.7,1.2)} {
+  \fill[unsafecol] \pt circle (0.08);
+}
+\foreach \pt in {(3.3,0.5), (3.6,1.0), (3.5,1.4), (4.0,1.6), (3.7,1.2), (4.2,1.0), (3.8,0.7)} {
+  \fill[safecol] \pt circle (0.08);
+}
+\end{tikzpicture}
+\vspace{0.3em}
+\begin{block}{The challenge}
+Plain MLP fits the local data well. But there are no training points at $V = 0.85$ or $\ell = 1.3$, so its prediction in those regions is arbitrary. We don't trust it for safety screening.
+\end{block}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Adding a limit-aware physics penalty}
+\textbf{Physics rule.} At any feature-space point $(V, \ell)$:
+\begin{itemize}
+  \item if $V < 0.95$ or $\ell > 1.0$, the prediction should be $\hat{y} \geq 0.5$ (unsafe).
+  \item if $V \geq 0.95$ and $\ell \leq 1.0$, the prediction should be $\hat{y} < 0.5$ (safe).
+\end{itemize}
+\textbf{Physics loss.} Sample $M = 1000$ random points $(V_j, \ell_j)$ uniformly over $[0.85, 1.10] \times [0.60, 1.30]$ -- no labels needed -- and add:
+\begin{align*}
+\mathcal{L}_{\text{phys}} \;=\; \tfrac{1}{M} \sum_j \biggl[
+& \mathbb{I}(V_j < 0.95 \;\text{or}\; \ell_j > 1.0) \cdot \max(0,\; 0.5 - \hat{y}_\theta(V_j, \ell_j))^2 \\
++\; & \mathbb{I}(V_j \geq 0.95 \;\text{and}\; \ell_j \leq 1.0) \cdot \max(0,\; \hat{y}_\theta(V_j, \ell_j) - 0.5)^2
+\biggr]
+\end{align*}
+\vspace{0.2em}
+\textbf{Total loss.} $\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{BCE on 30 labeled pts}} + \lambda \cdot \mathcal{L}_{\text{phys}}$, with $\lambda = 1.0$.
+\vspace{0.4em}
+\begin{alertblock}{Where the ``physics'' is}
+The rule (``V or current outside limits $\Rightarrow$ unsafe'') comes from engineering knowledge, not from the 30 labels. The penalty term injects this knowledge anywhere in the feature space, even where data is absent.
+\end{alertblock}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Plain MLP vs PI-MLP -- what changes}
+\centering
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+% Left: plain MLP boundary
+\begin{scope}[shift={(-4.5,0)}]
+\node at (2.5, 4) {\textbf{Plain MLP boundary}};
+\draw[->, thick] (-0.3,0) -- (5.0,0) node[right]{$V$};
+\draw[->, thick] (0,-0.3) -- (0,3.5) node[above]{$\ell$};
+% True safe rectangle (faint)
+\fill[safecol!10] (3,0) rectangle (5.0,2);
+% Plain MLP boundary: wavy, only correct near training data
+\draw[very thick, darkblue, smooth] plot coordinates {(2.5,3.3) (2.7,2.5) (2.9,2.0) (3.0,1.4) (3.0,0.7) (3.5,0.2) (4.5,0.0)};
+\node[darkblue, font=\tiny] at (1.5, 0.5) {extrapolates wrong};
+% Training data dots
+\foreach \pt in {(2.8,1.0), (3.1,0.9), (3.2,1.8), (2.9,1.4), (3.3,2.0), (3.1,1.6), (2.7,1.2), (3.3,0.5), (3.6,1.0), (3.5,1.4), (4.0,1.6), (3.7,1.2), (4.2,1.0), (3.8,0.7)} {
+  \fill[gray!50] \pt circle (0.05);
+}
+\end{scope}
+% Right: PI-MLP boundary
+\begin{scope}[shift={(2.5,0)}]
+\node at (2.5, 4) {\textbf{PI-MLP boundary}};
+\draw[->, thick] (-0.3,0) -- (5.0,0) node[right]{$V$};
+\draw[->, thick] (0,-0.3) -- (0,3.5) node[above]{$\ell$};
+\fill[safecol!10] (3,0) rectangle (5.0,2);
+\draw[very thick, darkred] (3, 3.5) -- (3, 2.0) -- (5.0, 2.0);
+\node[darkred, font=\tiny] at (1.6, 1.0) {respects $V\!=\!0.95$};
+\node[darkred, font=\tiny] at (4.5, 2.4) {respects $\ell\!=\!1.0$};
+\foreach \pt in {(2.8,1.0), (3.1,0.9), (3.2,1.8), (2.9,1.4), (3.3,2.0), (3.1,1.6), (2.7,1.2), (3.3,0.5), (3.6,1.0), (3.5,1.4), (4.0,1.6), (3.7,1.2), (4.2,1.0), (3.8,0.7)} {
+  \fill[gray!50] \pt circle (0.05);
+}
+\end{scope}
+\end{tikzpicture}
+\vspace{0.4em}
+\begin{block}{What the picture says}
+The plain MLP draws a curved boundary that fits the training points but bends in unexpected directions outside the data cluster. The PI-MLP draws a clean L-shape that matches the engineering rule everywhere -- even at $V = 0.85$ where no training data lives.
+\end{block}
+\end{frame}
+
+% ============================================================
+\begin{frame}[fragile]{In code -- adding a physics loss to a PyTorch training loop}
+\begin{lstlisting}[language=Python]
+import torch, torch.nn as nn
+
+# Plain MLP as in L05
+model = nn.Sequential(nn.Linear(2, 32), nn.ReLU(),
+                      nn.Linear(32, 32), nn.ReLU(),
+                      nn.Linear(32, 1),  nn.Sigmoid())
+opt = torch.optim.Adam(model.parameters(), lr=1e-3)
+bce = nn.BCELoss()
+
+def physics_loss(x, y_hat):
+    V, I = x[:, 0], x[:, 1]
+    should_be_unsafe = ((V < 0.95) | (I > 1.0)).float().unsqueeze(1)
+    should_be_safe   = 1.0 - should_be_unsafe
+    pen_unsafe = torch.relu(0.5 - y_hat) ** 2 * should_be_unsafe
+    pen_safe   = torch.relu(y_hat - 0.5) ** 2 * should_be_safe
+    return (pen_unsafe + pen_safe).mean()
+
+for epoch in range(200):
+    # data loss on 30 labeled points (X_tr, y_tr)
+    loss_data = bce(model(X_tr), y_tr)
+    # physics loss on 1000 random unlabeled points (X_phys)
+    loss_phys = physics_loss(X_phys, model(X_phys))
+    loss = loss_data + 1.0 * loss_phys
+    opt.zero_grad(); loss.backward(); opt.step()
+\end{lstlisting}
+\end{frame}
+
+% ============================================================
+\section*{6. When PINN helps -- and when not}
+
+\begin{frame}{When PINN helps}
+\begin{itemize}
+  \item \textbf{Sparse data.} Few labels but plenty of room to evaluate the physics. Most successful PINN applications fall here.
+  \item \textbf{Known physics.} The constraint is correct and easy to evaluate. Voltage limits and Ohm's law qualify; ``a wise human would say this is unsafe'' does not.
+  \item \textbf{Extrapolation matters.} The model will be queried outside the training distribution. Physics provides a fallback.
+  \item \textbf{Safety-critical applications.} You need to defend the model's behavior to regulators, operators, or reviewers.
+\end{itemize}
+\vspace{0.5em}
+\begin{block}{Why the project qualifies for all four}
+77 labeled samples, well-defined voltage / current / VUF limits, N-1 contingency analysis is inherently out-of-distribution (different from the base case), and the application is grid security.
+\end{block}
+\end{frame}
+
+% ============================================================
+\begin{frame}{When PINN does not help (or hurts)}
+\begin{enumerate}
+  \item \warnitem \textbf{Plenty of data, well-tuned baseline.} If a plain MLP already gets 99\% recall on a labeled dataset of millions, the physics term is noise. Common finding in large-scale tabular benchmarks.
+  \item \warnitem \textbf{Wrong physics.} If the constraint is a stale or approximate rule, it can pull the model away from the true distribution. Audit the constraint before trusting it.
+  \item \warnitem \textbf{Overweighted $\lambda$.} The model fits physics perfectly and ignores data. Showing up as ``training BCE never drops'' in your logs.
+  \item \warnitem \textbf{Optimization landscape conflicts.} Two competing terms with mismatched gradient magnitudes can stall training. Krishnapriyan et al.\ 2021 documents many failure modes.
+  \item \warnitem \textbf{Treating it as magic.} PINNs need just as much hyperparameter tuning, just as much validation discipline, as plain MLPs.
+\end{enumerate}
+\end{frame}
+
+% ============================================================
+\section*{7. Project: Week 6 PI-MLP composite loss}
+
+\begin{frame}{The five losses in Week 6}
+\begin{equation*}
+\mathcal{L}_{\text{PI-MLP}} \;=\; \lambda_1 \mathcal{L}_{\text{cls}} + \lambda_2 \mathcal{L}_{\text{sev}} + \lambda_3 \mathcal{L}_{\text{margin}} + \lambda_4 \mathcal{L}_{\text{consistency}} + \lambda_5 \mathcal{L}_{\text{rank}}
+\end{equation*}
+\vspace{0.3em}
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+Term & Role & Form \\
+\midrule
+$\mathcal{L}_{\text{cls}}$ & main classifier & weighted BCE \\
+$\mathcal{L}_{\text{sev}}$ & continuous severity signal & MSE on severity head \\
+$\mathcal{L}_{\text{margin}}$ & per-component (V, I, VUF) limit penalty & hinge-squared limit violations \\
+$\mathcal{L}_{\text{consistency}}$ & classification and severity agree & high $\hat{p}$ $\Leftrightarrow$ high $\hat{s}$ \\
+$\mathcal{L}_{\text{rank}}$ & top-$k$ screening order & pairwise hinge \\
+\bottomrule
+\end{tabular}
+\vspace{0.6em}
+\begin{block}{Default weights used in the notebook}
+$\lambda_1 = 1.0$, $\lambda_2 = 0.5$, $\lambda_3 = 0.3$, $\lambda_4 = 0.2$, $\lambda_5 = 0.3$. Tuned coarsely on validation -- the notebook walks through the sweep.
+\end{block}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Reading the ablation table}
+The project's Week 6 ablation peels each term off and re-trains:
+\vspace{0.3em}
+\centering
+\small
+\begin{tabular}{lcccc}
+\toprule
+Model variant & Recall & Precision & PF calls saved & Missed violations \\
+\midrule
+BaselineMLP (only $\mathcal{L}_{\text{cls}}$) & 1.000 & 0.857 & 0.300 & 0 \\
+PI-MLP no-rank ($-\mathcal{L}_{\text{rank}}$) & 1.000 & 0.923 & 0.350 & 0 \\
+\textbf{PI-MLP full} (all 5 terms) & \textbf{1.000} & \textbf{1.000} & \textbf{0.400} & \textbf{0} \\
+\bottomrule
+\end{tabular}
+\vspace{0.6em}
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{Reading the trend}
+\begin{itemize}
+  \item Each added term improves precision and PF-calls-saved.
+  \item Recall stays at 1.0 throughout (no missed violations).
+  \item The ranking term contributes the final precision lift.
+\end{itemize}
+\column{0.5\textwidth}
+\begin{alertblock}{Honest caveat}
+77 samples. The ablation tells a clean story \emph{on this dataset}; scaling to hundreds of feeders is needed to claim the ranking is operationally robust.
+\end{alertblock}
+\end{columns}
+\end{frame}
+
+% ============================================================
+\section*{8. Recap}
+
 \begin{frame}{Homework}
-\TODO{Suggest: take the MLP from L05 (e.g., trained on a small N-1 dataset), add a voltage-limit penalty term, retune $\lambda$, and report whether recall and precision improve. Plot loss components over training.}
+\begin{block}{Required}
+\begin{enumerate}
+  \item Reproduce the toy $(V, \ell)$ example. Train a plain MLP on 30 labeled points, then a PI-MLP with the limit-aware physics loss. Plot decision boundaries.
+  \item Sweep $\lambda \in \{0, 0.01, 0.1, 1.0, 10.0, 100.0\}$. Report the validation accuracy at each. Where does the PI-MLP start to ignore the labels?
+  \item Make the training data even sparser (10 points). Does the gap between plain MLP and PI-MLP widen?
+  \item Replace the hard rule ``$V < 0.95$ $\Rightarrow$ unsafe'' with a soft rule that has a fuzzy margin. Re-derive the penalty. Implement and compare.
+\end{enumerate}
+\end{block}
+\begin{block}{Optional}
+\begin{enumerate}
+  \item Add a third feature (VUF) and a third limit (2\%). Train. How does the loss decomposition change?
+  \item Replace the MLP backbone with the GCN from L06. Implement the limit penalty per node. Does the GNN benefit?
+\end{enumerate}
+\end{block}
 \end{frame}
 
+% ============================================================
 \begin{frame}{Exit checklist}
-\TODO{Items: (1) write the generic PINN loss form, (2) distinguish soft and strict constraints, (3) list the 5 physics terms used in the project, (4) name one scenario where PINNs help and one where they don't.}
+\begin{enumerate}
+  \item \checkitem I can write the generic PINN loss $\mathcal{L} = \mathcal{L}_{\text{data}} + \lambda \mathcal{L}_{\text{phys}}$ from memory.
+  \item \checkitem I can name three reasons to put physics in the loss.
+  \item \checkitem I can distinguish a soft constraint from a strict / projected one and pick the right tool.
+  \item \checkitem I can list the five physics-informed terms in the project's PI-MLP and what each does.
+  \item \checkitem I can implement a limit-aware physics loss in PyTorch in $\sim 10$ lines.
+  \item \checkitem I can name two scenarios where PINNs help and two where they hurt.
+  \item \checkitem I can read the Week 6 ablation table and explain which loss term contributes which gain.
+\end{enumerate}
 \end{frame}
 
+% ============================================================
 \begin{frame}{References}
-\TODO{Raissi, Perdikaris, Karniadakis 2019 (\emph{JCP}); Karniadakis et al. 2021 \emph{Nature Reviews Physics} survey; Krishnapriyan et al. 2021 (\emph{NeurIPS}, on PINN failure modes); Recent power-system PINN surveys (Misyris et al., Stiasny et al.).}
+\footnotesize
+\begin{itemize}
+  \item \textbf{Raissi, Perdikaris, Karniadakis, 2019.} \emph{Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations}, JCP. The canonical reference.
+  \item \textbf{Karniadakis et al., 2021.} \emph{Physics-informed machine learning}, Nature Reviews Physics. Comprehensive survey.
+  \item \textbf{Krishnapriyan et al., 2021.} \emph{Characterizing possible failure modes in physics-informed neural networks}, NeurIPS. Required reading on PINN pathologies.
+  \item \textbf{Misyris, Venzke, Chatzivasileiadis, 2020.} \emph{Physics-informed neural networks for power systems}, IEEE PES General Meeting. Power-system application.
+  \item \textbf{Stiasny, Misyris, Chatzivasileiadis, 2021.} \emph{Physics-informed neural networks for non-linear system identification: applications to power systems}, IEEE Madrid PowerTech.
+  \item \textbf{Donon et al., 2020.} \emph{Graph Neural Solver for Power Systems}, IJCNN. GNN + physics.
+\end{itemize}
 \end{frame}
 
 \end{document}

@@ -7,15 +7,40 @@
 
 \usepackage{amsmath,amssymb,booktabs,array}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc,decorations.pathreplacing}
+\usepackage{listings}
 \usepackage{xcolor}
 \usepackage{hyperref}
 
+\definecolor{codebg}{RGB}{248,248,248}
 \definecolor{darkblue}{RGB}{0,65,120}
+\definecolor{darkgreen}{RGB}{0,105,70}
+\definecolor{warnorange}{RGB}{190,110,0}
+\definecolor{darkred}{RGB}{160,30,30}
+\definecolor{phasea}{RGB}{200,40,40}
+\definecolor{phaseb}{RGB}{40,40,180}
+\definecolor{phasec}{RGB}{20,130,40}
+
 \hypersetup{colorlinks=true,linkcolor=darkblue,urlcolor=darkblue}
 
+\lstdefinestyle{pythonstyle}{
+    language=Python,
+    basicstyle=\ttfamily\scriptsize,
+    keywordstyle=\color{darkblue}\bfseries,
+    commentstyle=\color{darkgreen},
+    stringstyle=\color{warnorange},
+    showstringspaces=false,
+    columns=fullflexible,
+    backgroundcolor=\color{codebg},
+    frame=single,
+    rulecolor=\color{black!15},
+    breaklines=true
+}
+\lstset{style=pythonstyle}
+
 \newcommand{\code}[1]{\texttt{#1}}
-\newcommand{\TODO}[1]{\textcolor{red}{\textbf{TODO:}} \emph{#1}}
+\newcommand{\checkitem}{\textcolor{darkgreen}{\Large$\checkmark$}\;}
+\newcommand{\warnitem}{\textcolor{warnorange}{\Large$\triangle$}\;}
 
 \title[L03: Balanced PF]{L03 -- Balanced (Single-phase Equivalent) Power Flow}
 \subtitle{Foundations Lecture Series}
@@ -25,94 +50,526 @@
 
 \begin{document}
 
+% ============================================================
 \begin{frame}
   \titlepage
+  \vspace{-0.8em}
   \begin{center}
-    \small Keywords: positive sequence, single-line diagram, three-phase symmetry, when balance holds
+    \small Keywords: balanced operation, phasor symmetry, single-line diagram, positive sequence, when balance lies
   \end{center}
 \end{frame}
 
 % ============================================================
 \begin{frame}{Lecture roadmap}
 \begin{enumerate}
-  \item What ``balanced'' actually means
-  \item The single-phase equivalent: how we collapse three phases into one
-  \item Positive-sequence networks
-  \item When the balanced assumption is appropriate
-  \item When it lies: preview of L04
+  \item What ``balanced'' actually means (with phasor pictures)
+  \item Where symmetry must hold: source, load, network
+  \item The collapse: three coupled equations $\to$ one
+  \item Single-line diagrams as the visual shortcut
+  \item Positive sequence as the right vocabulary (preview of L04)
+  \item When balanced PF is appropriate
+  \item When it lies -- a numerical example
 \end{enumerate}
 \vspace{0.6em}
 \begin{block}{Prerequisite}
-L01 -- you should be comfortable with $Y_{\text{bus}}$ and the PF equations. L02 helpful but not required.
+L01 -- $Y_{\text{bus}}$, NR, slack/PV/PQ. L02 helpful but not required.
 \end{block}
 \end{frame}
 
 % ============================================================
 \section*{1. What ``balanced'' means}
 
-\begin{frame}{Definition of balanced operation}
-\TODO{Three-phase voltages and currents equal in magnitude, $120^\circ$ apart, sinusoidal. Source is symmetric, loads are symmetric, line parameters are symmetric. Visual: phasor diagram of a balanced set.}
+\begin{frame}{Balanced three-phase set in pictures}
+\centering
+\begin{tikzpicture}[scale=0.85]
+% Left: time-domain sinusoids
+\begin{scope}[shift={(-5,0)}]
+\draw[->, thick] (-0.3,0) -- (5.0,0) node[right, font=\scriptsize]{$t$};
+\draw[->, thick] (0,-1.4) -- (0,1.4) node[above, font=\scriptsize]{$v(t)$};
+\draw[domain=0:4.5, smooth, samples=80, thick, phasea] plot ({\x}, {sin(\x*180/1.5)});
+\draw[domain=0:4.5, smooth, samples=80, thick, phaseb] plot ({\x}, {sin(\x*180/1.5 - 120)});
+\draw[domain=0:4.5, smooth, samples=80, thick, phasec] plot ({\x}, {sin(\x*180/1.5 + 120)});
+\node[phasea, font=\scriptsize] at (4.8, 0.95) {$v_a$};
+\node[phaseb, font=\scriptsize] at (4.8, -0.2) {$v_b$};
+\node[phasec, font=\scriptsize] at (4.8, -0.85) {$v_c$};
+\node[font=\scriptsize] at (2.2, -1.7) {\textbf{Time domain}};
+\end{scope}
+% Right: phasor diagram
+\begin{scope}[shift={(2,0)}]
+\draw[->, gray!50] (-2.0,0)--(2.2,0);
+\draw[->, gray!50] (0,-2.0)--(0,2.0);
+\draw[->, very thick, phasea] (0,0) -- ({1.7*cos(0)},{1.7*sin(0)}) node[right, font=\scriptsize]{$\mathbf{V}_a$};
+\draw[->, very thick, phaseb] (0,0) -- ({1.7*cos(-120)},{1.7*sin(-120)}) node[below left, font=\scriptsize]{$\mathbf{V}_b$};
+\draw[->, very thick, phasec] (0,0) -- ({1.7*cos(120)},{1.7*sin(120)}) node[above left, font=\scriptsize]{$\mathbf{V}_c$};
+\draw[gray!50, dashed] (0,0) circle (1.7);
+\node[gray!70, font=\tiny] at (1.3, -1.4) {$120^\circ$};
+\node[font=\scriptsize] at (0, -2.4) {\textbf{Phasor domain}};
+\end{scope}
+\end{tikzpicture}
+\vspace{0.4em}
+\begin{block}{Two equivalent statements of ``balanced''}
+\begin{itemize}
+  \item \textbf{Time domain:} three sinusoids of equal amplitude, $120^\circ$ apart in phase.
+  \item \textbf{Phasor domain:} three vectors of equal length, $120^\circ$ apart in angle.
+\end{itemize}
+Both views describe the same physical assumption.
+\end{block}
 \end{frame}
 
-\begin{frame}{Symmetry assumptions in three places}
-\TODO{(i) Source symmetry, (ii) load symmetry, (iii) line geometry symmetry (or transposition). All three usually hold in transmission, often fail in distribution. Bridge: under all three, three coupled equations collapse to one.}
+% ============================================================
+\begin{frame}{Algebraic statement: the $a$-operator}
+Define the rotation operator
+\begin{equation*}
+a \;=\; e^{j 2\pi/3} \;=\; e^{j 120^\circ} \;=\; -\tfrac{1}{2} + j\tfrac{\sqrt{3}}{2}.
+\end{equation*}
+Then a balanced phase-$a$, phase-$b$, phase-$c$ set satisfies
+\begin{equation*}
+\boxed{\;\;\mathbf{V}_b \;=\; a^2 \, \mathbf{V}_a, \qquad \mathbf{V}_c \;=\; a \, \mathbf{V}_a\;\;}
+\end{equation*}
+\vspace{0.2em}
+And likewise for currents:
+\begin{equation*}
+\mathbf{I}_b \;=\; a^2 \, \mathbf{I}_a, \qquad \mathbf{I}_c \;=\; a \, \mathbf{I}_a.
+\end{equation*}
+\vspace{0.3em}
+\begin{alertblock}{Why this matters for computation}
+If $\mathbf{V}_a$ is known, $\mathbf{V}_b$ and $\mathbf{V}_c$ are determined by multiplication. \textbf{One unknown per bus instead of three.} The whole simplification of single-line analysis flows from this identity.
+\end{alertblock}
+\end{frame}
+
+% ============================================================
+\begin{frame}{The three places where symmetry must hold}
+\begin{columns}[T]
+\column{0.33\textwidth}
+\textbf{1. Source symmetry}
+\begin{itemize}
+  \item Generators produce three phases equal in magnitude and $120^\circ$ apart.
+  \item Transformer windings are symmetric.
+  \item The slack bus is itself balanced.
+\end{itemize}
+\column{0.33\textwidth}
+\textbf{2. Load symmetry}
+\begin{itemize}
+  \item Every three-phase load draws equal $P$, $Q$ on each phase.
+  \item No single-phase laterals.
+  \item No phase-A-only PV.
+\end{itemize}
+\column{0.33\textwidth}
+\textbf{3. Network symmetry}
+\begin{itemize}
+  \item Each line has equal self-impedance on all phases.
+  \item Mutual coupling is the same A-B, B-C, A-C.
+  \item Transposed lines or equivalent.
+\end{itemize}
+\end{columns}
+\vspace{0.8em}
+\begin{block}{All three or none}
+The single-line simplification requires \emph{all three} assumptions simultaneously. Break any one and the per-phase quantities drift apart -- exactly what L04 will measure.
+\end{block}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Where each assumption is typically OK or not}
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+ & Source sym.\ & Load sym.\ & Network sym.\ \\
+\midrule
+HV transmission (220+ kV) & \checkitem & \checkitem & \checkitem \\
+MV distribution (10--35 kV) & \checkitem & roughly \checkitem & roughly \checkitem \\
+LV three-phase (400 V industrial) & \checkitem & sometimes & sometimes \\
+LV residential (400 V, single-phase laterals) & \checkitem & \warnitem & \warnitem \\
+LV with single-phase PV / EV / heat pumps & \checkitem & \warnitem\,\warnitem & \warnitem \\
+Microgrid (LV) & \checkitem & \warnitem\,\warnitem & \warnitem \\
+\bottomrule
+\end{tabular}
+\vspace{0.6em}
+\begin{block}{Reading this table}
+The further down the table you go, the more single-line analysis becomes a useful first pass rather than a correct answer. By the time you hit the bottom row -- which is the regime of this project -- you \emph{must} go to L04 to claim phase-specific results.
+\end{block}
 \end{frame}
 
 % ============================================================
 \section*{2. The single-phase equivalent}
 
-\begin{frame}{Collapsing three phases into one}
-\TODO{Show that under balance, $V_b = a^2 V_a$ and $V_c = a V_a$ with $a = e^{j 2\pi/3}$. Therefore we only need to solve for phase $a$ -- the other phases follow by rotation. This is the ``single-line diagram'' you usually see.}
-\end{frame}
+\begin{frame}{Three coupled equations collapse to one}
+Without balance, the three-phase nodal equation at each bus is
+\begin{equation*}
+\begin{bmatrix} \mathbf{I}_a \\ \mathbf{I}_b \\ \mathbf{I}_c \end{bmatrix}
+\;=\;
+\underbrace{\begin{bmatrix}
+Y_{aa} & Y_{ab} & Y_{ac} \\
+Y_{ba} & Y_{bb} & Y_{bc} \\
+Y_{ca} & Y_{cb} & Y_{cc}
+\end{bmatrix}}_{\text{3$\times$3 phase-domain admittance}}
+\begin{bmatrix} \mathbf{V}_a \\ \mathbf{V}_b \\ \mathbf{V}_c \end{bmatrix}
+\end{equation*}
+For $N$ buses this is a $3N$-dimensional linear system.
+\vspace{0.3em}
 
-\begin{frame}{Single-line diagrams in practice}
-\TODO{Visual example: a small system shown both as a true three-phase circuit and as its single-line equivalent. Note that one-line diagrams in textbooks and pandapower's \code{runpp} both implicitly use this collapse.}
+Under the three symmetry assumptions, the $3\times 3$ phase block has the structure
+$Y_{aa}=Y_{bb}=Y_{cc}$ (self) and $Y_{ab}=Y_{bc}=Y_{ca}$ (mutual). Combined with the rotation identities $\mathbf{V}_b = a^2 \mathbf{V}_a$ and $\mathbf{V}_c = a \mathbf{V}_a$, the three rows above reduce to a \emph{single} equation per bus:
+\begin{equation*}
+\boxed{\;\;\mathbf{I}_a \;=\; Y^{(1)} \, \mathbf{V}_a\;\;}
+\end{equation*}
+where $Y^{(1)} = Y_{aa} + a \, Y_{ab} + a^2 \, Y_{ac}$ is the \emph{positive-sequence admittance}.
 \end{frame}
 
 % ============================================================
-\section*{3. Positive-sequence networks}
-
-\begin{frame}{Positive sequence in 30 seconds}
-\TODO{Forward-reference to L04's symmetrical components: positive, negative, zero. Under balance, only positive sequence is non-zero. Negative and zero sequence appear only when balance breaks.}
+\begin{frame}{Visual: three-line vs single-line diagram}
+\centering
+\begin{tikzpicture}[node distance=1.2cm and 1.2cm, every node/.style={font=\scriptsize}]
+% Three-line on left
+\begin{scope}[shift={(-3.5,0)}]
+\node at (0,1.7) {\textbf{Three-line diagram}};
+\node[draw, circle, minimum size=0.45cm, fill=blue!10] (b1a) at (0, 0.8) {};
+\node[draw, circle, minimum size=0.45cm, fill=blue!10] (b1b) at (0, 0.0) {};
+\node[draw, circle, minimum size=0.45cm, fill=blue!10] (b1c) at (0,-0.8) {};
+\node[draw, circle, minimum size=0.45cm, fill=blue!10] (b2a) at (3, 0.8) {};
+\node[draw, circle, minimum size=0.45cm, fill=blue!10] (b2b) at (3, 0.0) {};
+\node[draw, circle, minimum size=0.45cm, fill=blue!10] (b2c) at (3,-0.8) {};
+\draw[thick, phasea] (b1a)--(b2a) node[midway, above, font=\tiny]{phase A};
+\draw[thick, phaseb] (b1b)--(b2b) node[midway, above, font=\tiny]{phase B};
+\draw[thick, phasec] (b1c)--(b2c) node[midway, above, font=\tiny]{phase C};
+\draw[dotted, gray] (b1a)--(b1b); \draw[dotted, gray] (b1b)--(b1c);
+\draw[dotted, gray] (b2a)--(b2b); \draw[dotted, gray] (b2b)--(b2c);
+\node[font=\tiny, gray] at (-0.8, 0.0) {mutual};
+\node[font=\tiny, gray] at (3.8, 0.0) {coupling};
+\end{scope}
+% Single-line on right
+\begin{scope}[shift={(4.0,0)}]
+\node at (1.5, 1.7) {\textbf{Single-line equivalent}};
+\node[draw, circle, minimum size=0.6cm, fill=blue!10] (s1) at (0, 0.0) {};
+\node[draw, circle, minimum size=0.6cm, fill=blue!10] (s2) at (3, 0.0) {};
+\draw[very thick] (s1)--(s2) node[midway, above]{$Z^{(1)}$};
+\node[below=0.1cm of s1, font=\tiny]{bus 1};
+\node[below=0.1cm of s2, font=\tiny]{bus 2};
+\end{scope}
+\end{tikzpicture}
+\vspace{0.4em}
+\begin{block}{What the collapse buys us}
+\begin{itemize}
+  \item \textbf{Storage:} $3 \times$ less state, $9 \times$ less admittance matrix.
+  \item \textbf{Computation:} a $3N \times 3N$ Jacobian becomes $N \times N$.
+  \item \textbf{Cognition:} you can read a one-line diagram on one piece of paper.
+\end{itemize}
+\end{block}
 \end{frame}
 
+% ============================================================
 \begin{frame}{The math is L01's math}
-\TODO{Show that the PF equations from L01 \emph{are} the positive-sequence PF equations. \code{pp.runpp} solves them. Nothing new computationally -- only the interpretation changes.}
+\textbf{What you saw in L01:}
+\begin{itemize}
+  \item Built a single $Y_{\text{bus}}$ from line impedances $z_{ij}$.
+  \item Wrote one PF equation per bus.
+  \item Solved with Newton-Raphson.
+  \item Read \code{net.res\_bus.vm\_pu} and \code{net.res\_line.loading\_percent}.
+\end{itemize}
+\vspace{0.3em}
+\textbf{What you were actually doing (without knowing the name):}
+\begin{itemize}
+  \item Building the \emph{positive-sequence} $Y_{\text{bus}}$.
+  \item Solving the \emph{positive-sequence} PF.
+  \item Reading the \emph{positive-sequence} bus voltages.
+  \item Implicitly relying on all three symmetry assumptions.
+\end{itemize}
+\vspace{0.4em}
+\begin{alertblock}{Why this re-labeling matters}
+When we get to L04, ``positive sequence'' is one of three coordinates we will track. The other two -- negative and zero sequence -- are exactly the modes that single-line analysis throws away.
+\end{alertblock}
 \end{frame}
 
 % ============================================================
-\section*{4. When balance is appropriate}
+\section*{3. Positive sequence -- a preview of L04}
 
-\begin{frame}{When the assumption is fine}
-\TODO{Transmission grids: three-phase loads, transposed lines, large industrial loads. The assumption introduces small ($< 1\%$) errors. List several practical examples where balanced PF is the right tool.}
-\end{frame}
-
-\begin{frame}{Quick-and-dirty hosting analyses}
-\TODO{For distribution-level studies where the question is ``rough voltage profile, rough loading'', balanced PF is sometimes acceptable as a first pass. Note caveats: never claim phase-specific results from a balanced model.}
+\begin{frame}{Three sequence components in one slide}
+Any three-phase phasor set $(\mathbf{V}_a, \mathbf{V}_b, \mathbf{V}_c)$ can be uniquely written as the sum of three balanced sets:
+\begin{align*}
+\mathbf{V}_a &= \mathbf{V}^{(1)} \;+\; \mathbf{V}^{(2)} \;+\; \mathbf{V}^{(0)} \\
+\mathbf{V}_b &= a^2\, \mathbf{V}^{(1)} \;+\; a\, \mathbf{V}^{(2)} \;+\; \mathbf{V}^{(0)} \\
+\mathbf{V}_c &= a\, \mathbf{V}^{(1)} \;+\; a^2\, \mathbf{V}^{(2)} \;+\; \mathbf{V}^{(0)}
+\end{align*}
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+Component & Pattern & Meaning \\
+\midrule
+\textbf{Positive} ($V^{(1)}$) & balanced, rotating ABC & true balanced operation \\
+\textbf{Negative} ($V^{(2)}$) & balanced, rotating ACB & a measure of phase asymmetry \\
+\textbf{Zero} ($V^{(0)}$) & all three in phase & a measure of common-mode shift \\
+\bottomrule
+\end{tabular}
+\vspace{0.3em}
+\begin{block}{Key fact for this lecture}
+Under balanced operation, $\mathbf{V}^{(2)} = \mathbf{V}^{(0)} = 0$. \textbf{Balanced PF is positive-sequence PF.} L04 will build all three.
+\end{block}
 \end{frame}
 
 % ============================================================
-\section*{5. When it lies}
-
-\begin{frame}{Where the balanced assumption breaks}
-\TODO{Single-phase loads, single-phase rooftop PV, EV charging, asymmetric line geometry, fault analysis. Show a small example where balanced PF reports ``all good'' but the actual three-phase analysis (L04) shows phase A undervoltage.}
-\end{frame}
-
-\begin{frame}{Diagnostic: when do I need L04?}
-\TODO{A short checklist for students: (1) Are loads single-phase? (2) Is PV single-phase? (3) Are line parameters asymmetric? (4) Is the network LV? If any yes, you need unbalanced PF.}
+\begin{frame}{Visualizing the sequence decomposition}
+\centering
+\begin{tikzpicture}[scale=0.85]
+% positive
+\begin{scope}[shift={(-5,0)}]
+\node[font=\scriptsize] at (0, 1.8) {\textbf{Positive ($V^{(1)}$)}};
+\draw[->, gray!40] (-1.6,0)--(1.6,0); \draw[->, gray!40] (0,-1.5)--(0,1.5);
+\draw[->, very thick, phasea] (0,0) -- ({1.2*cos(0)},{1.2*sin(0)});
+\draw[->, very thick, phaseb] (0,0) -- ({1.2*cos(-120)},{1.2*sin(-120)});
+\draw[->, very thick, phasec] (0,0) -- ({1.2*cos(120)},{1.2*sin(120)});
+\node[font=\tiny] at (0, -1.9) {ABC rotation};
+\end{scope}
+% negative
+\begin{scope}[shift={(0,0)}]
+\node[font=\scriptsize] at (0, 1.8) {\textbf{Negative ($V^{(2)}$)}};
+\draw[->, gray!40] (-1.6,0)--(1.6,0); \draw[->, gray!40] (0,-1.5)--(0,1.5);
+\draw[->, very thick, phasea] (0,0) -- ({0.8*cos(0)},{0.8*sin(0)});
+\draw[->, very thick, phaseb] (0,0) -- ({0.8*cos(120)},{0.8*sin(120)});
+\draw[->, very thick, phasec] (0,0) -- ({0.8*cos(-120)},{0.8*sin(-120)});
+\node[font=\tiny] at (0, -1.9) {ACB rotation};
+\end{scope}
+% zero
+\begin{scope}[shift={(5,0)}]
+\node[font=\scriptsize] at (0, 1.8) {\textbf{Zero ($V^{(0)}$)}};
+\draw[->, gray!40] (-1.6,0)--(1.6,0); \draw[->, gray!40] (0,-1.5)--(0,1.5);
+\draw[->, very thick, phasea] (0,-0.04) -- (0.6,-0.04);
+\draw[->, very thick, phaseb] (0, 0.0) -- (0.6, 0.0);
+\draw[->, very thick, phasec] (0, 0.04) -- (0.6, 0.04);
+\node[font=\tiny] at (0, -1.9) {all three identical};
+\end{scope}
+\end{tikzpicture}
+\vspace{0.4em}
+\begin{block}{Sanity check}
+Try summing the three positive-sequence phasors at the same instant -- they cancel (sum to zero). The same is true for the negative set. The zero-sequence phasors sum to $3 V^{(0)}$ -- which is why the neutral conductor carries it.
+\end{block}
 \end{frame}
 
 % ============================================================
+\section*{4. When balanced PF is appropriate}
+
+\begin{frame}{Where balanced PF actually works well}
+\textbf{Strong-balance domains:}
+\begin{itemize}
+  \item \textbf{HV transmission} (110--765 kV): transposed lines, three-phase generators, large aggregated loads. Phase-to-phase mismatch typically $< 0.5\%$.
+  \item \textbf{Power plants and substations}: three-phase machines, transformers, breakers -- inherently symmetric.
+  \item \textbf{MV industrial loads}: large motors and arc furnaces, drawing all three phases.
+  \item \textbf{Bulk planning studies}: market clearing, OPF, long-term expansion -- phase detail is not the question being asked.
+\end{itemize}
+\vspace{0.4em}
+\begin{block}{Why we still use balanced PF every day}
+$\sim 3\times$ fewer variables, $\sim 9\times$ smaller admittance matrix, much faster convergence. For most transmission-scale studies, the precision is more than enough.
+\end{block}
+\end{frame}
+
+% ============================================================
+\begin{frame}{How big are the errors, typically?}
+\centering
+\small
+\begin{tabular}{lcc}
+\toprule
+Scenario & Bal.\ PF voltage error & Bal.\ PF safe to use? \\
+\midrule
+HV transmission, transposed & $< 0.5\%$ & \checkitem \\
+MV distribution, transposed, balanced loads & 0.5--2\% & \checkitem \\
+LV three-phase industrial & 1--3\% & usually \\
+LV residential, mild unbalance & 2--5\% & for planning only \\
+LV with 30\% single-phase PV & 5--10\% & \warnitem \\
+LV microgrid with single-phase DER + EV & $>$ 10\%, can hide violations & \warnitem\,\warnitem \\
+\bottomrule
+\end{tabular}
+\vspace{0.6em}
+\begin{block}{Practical recipe}
+If the worst case you care about can be hidden by a 5\% voltage error, you cannot use balanced PF. In a project like ours -- where N-1 contingencies create phase-specific risks -- the answer is always L04.
+\end{block}
+\end{frame}
+
+% ============================================================
+\section*{5. When balanced PF lies}
+
+\begin{frame}{A diagnostic checklist}
+\textbf{If \emph{any} of the following is true, balanced PF can hide real violations:}
+\begin{enumerate}
+  \item Loads or DER attached to one or two phases only.
+  \item Line parameters that differ phase-to-phase (untransposed LV).
+  \item Neutral conductor effects or grounding asymmetry.
+  \item Fault analysis (faults are inherently unbalanced).
+  \item Single-phase protection or per-phase tap controllers.
+\end{enumerate}
+\vspace{0.4em}
+\begin{alertblock}{The microgrid baseline}
+LV microgrids match items 1, 2, and often 3. Doing balanced PF in this regime and quoting per-phase results would be dishonest. We will not do that in this course.
+\end{alertblock}
+\end{frame}
+
+% ============================================================
+\begin{frame}{A numerical example: balanced PF lies}
+A 2-bus LV feeder. Line: $z = 0.05 + j0.05$ pu (high R/X, LV-like). Slack at $V_1 = 1.00$.\\[0.3em]
+Total load at bus 2 is the same in both scenarios:
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{Scenario A: balanced load}
+\begin{itemize}
+  \item $0.133$ pu on each of phases A, B, C
+  \item Total $P = 0.4$ pu, balanced
+\end{itemize}
+\column{0.5\textwidth}
+\textbf{Scenario B: same total, all on phase A}
+\begin{itemize}
+  \item $0.4$ pu on phase A, $0$ on B and C
+  \item Total $P = 0.4$ pu, very unbalanced
+\end{itemize}
+\end{columns}
+\vspace{0.6em}
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+ & $|V_a|$ at bus 2 & $|V_b|$ at bus 2 & $|V_c|$ at bus 2 \\
+\midrule
+\textbf{What balanced PF reports} (both scenarios) & 0.993 & 0.993 & 0.993 \\
+\textbf{What 3$\phi$ PF says, Scenario A} (truly balanced) & 0.993 & 0.993 & 0.993 \\
+\textbf{What 3$\phi$ PF says, Scenario B} (load on A only) & \textbf{0.908} & 1.029 & 0.995 \\
+\bottomrule
+\end{tabular}
+\vspace{0.5em}
+\begin{alertblock}{The lie}
+For Scenario B, balanced PF reports ``$V = 0.993$, no violation anywhere''. The true phase-A voltage is $0.908$ -- well below the $0.95$ limit. \textbf{Phase A is in violation and the balanced model cannot see it.} L04 will derive these numbers from scratch using symmetrical components.
+\end{alertblock}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Visualizing the lie}
+\centering
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+% Left: balanced PF report
+\begin{scope}[shift={(-4.5,0)}]
+\node at (0, 3.3) {\textbf{What balanced PF reports}};
+\draw[->, thick] (-0.3,0)--(2.3,0) node[right]{phase};
+\draw[->, thick] (0,0)--(0,3.0) node[above]{$|V|$ (pu)};
+\draw[dashed, darkred] (-0.3,2.7)--(2.3,2.7) node[right, darkred]{1.05};
+\draw[dashed, darkred] (-0.3,1.5)--(2.3,1.5) node[right, darkred]{0.95};
+\fill[gray!60] (0.2,0) rectangle (0.7,2.02); \node at (0.45,-0.2) {A};
+\fill[gray!60] (0.9,0) rectangle (1.4,2.02); \node at (1.15,-0.2) {B};
+\fill[gray!60] (1.6,0) rectangle (2.1,2.02); \node at (1.85,-0.2) {C};
+\node[font=\tiny] at (1.15, 2.2) {all at 0.993};
+\node[darkgreen, font=\scriptsize] at (1.15, -0.7) {``no violation''};
+\end{scope}
+% Right: actual 3-phase result
+\begin{scope}[shift={(2.0,0)}]
+\node at (0, 3.3) {\textbf{What 3$\phi$ PF actually finds (Scen.\ B)}};
+\draw[->, thick] (-0.3,0)--(2.3,0) node[right]{phase};
+\draw[->, thick] (0,0)--(0,3.0) node[above]{$|V|$ (pu)};
+\draw[dashed, darkred] (-0.3,2.7)--(2.3,2.7) node[right, darkred]{1.05};
+\draw[dashed, darkred] (-0.3,1.5)--(2.3,1.5) node[right, darkred]{0.95};
+\fill[phasea] (0.2,0) rectangle (0.7,1.00); \node at (0.45,-0.2) {A};
+\fill[phaseb] (0.9,0) rectangle (1.4,2.45); \node at (1.15,-0.2) {B};
+\fill[phasec] (1.6,0) rectangle (2.1,2.04); \node at (1.85,-0.2) {C};
+\node[phasea, font=\tiny] at (0.45, 1.20) {0.908};
+\node[phaseb, font=\tiny] at (1.15, 2.65) {1.029};
+\node[phasec, font=\tiny] at (1.85, 2.24) {0.995};
+\node[darkred, font=\scriptsize] at (1.15, -0.7) {phase A violated};
+\end{scope}
+\end{tikzpicture}
+\vspace{0.3em}
+\begin{block}{Reading this picture}
+Same network. Same total load. Two solvers tell you different stories. In a safety-critical context (which microgrid N-1 screening is), the difference matters: the balanced view would let an operator approve a state that is actually unsafe.
+\end{block}
+\end{frame}
+
+% ============================================================
+\section*{6. The decision: balanced or three-phase?}
+
+\begin{frame}{A two-line decision tree}
+\centering
+\begin{tikzpicture}[node distance=0.6cm and 1.3cm, every node/.style={font=\scriptsize}]
+\tikzset{q/.style={draw, rounded corners, align=center, fill=blue!10, minimum width=4.2cm, minimum height=0.8cm}}
+\tikzset{a/.style={draw, rounded corners, align=center, minimum width=3.8cm, minimum height=0.7cm}}
+\node[q] (q1) {Are loads, DER, and lines all symmetric on the three phases?};
+\node[a, fill=green!12, below left=of q1, xshift=-1.5cm] (yes) {YES \\ use balanced PF (\code{runpp})};
+\node[a, fill=red!12, below right=of q1, xshift=1.5cm] (no)  {NO \\ use three-phase PF (\code{runpp\_3ph})};
+\draw[->, thick] (q1.south) -- node[left, font=\tiny, xshift=-0.3cm]{yes} (yes.north);
+\draw[->, thick] (q1.south) -- node[right, font=\tiny, xshift=0.3cm]{no} (no.north);
+\end{tikzpicture}
+\vspace{0.6em}
+\begin{block}{Decision in plain language}
+If you can answer ``yes'' confidently and the cost of being wrong is low (planning, market clearing), use balanced PF. If you cannot, or if a hidden violation is consequential (operations, safety screening), pay the extra cost of \code{runpp\_3ph}.
+\end{block}
+\end{frame}
+
+% ============================================================
+\begin{frame}[fragile]{pandapower preview: same network, two calls}
+\begin{lstlisting}[language=Python]
+import pandapower as pp
+
+# Build a small balanced system (same as L01)
+net = pp.create_empty_network()
+b1 = pp.create_bus(net, vn_kv=0.4)
+b2 = pp.create_bus(net, vn_kv=0.4)
+pp.create_ext_grid(net, bus=b1, vm_pu=1.0)
+pp.create_line_from_parameters(net, b1, b2, length_km=1,
+    r_ohm_per_km=0.08, x_ohm_per_km=0.08,
+    c_nf_per_km=0.0, max_i_ka=0.4)
+pp.create_load(net, bus=b2, p_mw=0.6, q_mvar=0.0)
+
+# --- Balanced PF (single voltage per bus) ---
+pp.runpp(net)
+print(net.res_bus[["vm_pu", "va_degree"]])
+
+# --- Three-phase PF (one voltage per phase per bus) ---
+pp.runpp_3ph(net)
+print(net.res_bus_3ph[["vm_a_pu", "vm_b_pu", "vm_c_pu",
+                       "unbalance_percent"]])
+\end{lstlisting}
+\begin{alertblock}{What the result columns tell you}
+\code{res\_bus} has 1 voltage per bus. \code{res\_bus\_3ph} has 3. Pick the API to match the question you are asking.
+\end{alertblock}
+\end{frame}
+
+% ============================================================
+\section*{7. Recap}
+
 \begin{frame}{Homework}
-\TODO{Take the L01 three-bus system, intentionally make one of the loads single-phase, and explain why \code{runpp} silently lies. Run \code{runpp\_3ph} on the same system and report the per-phase voltage spread.}
+\begin{block}{Required}
+\begin{enumerate}
+  \item In pandapower, build a 3-bus balanced LV network. Run \code{pp.runpp(net)} and \code{pp.runpp\_3ph(net)}. Verify $|V|$ matches across both APIs to 4 decimal places.
+  \item Replace the balanced load with an \code{asymmetric\_load} on phase A only (same total $P$). Re-run \code{pp.runpp\_3ph}. Report $|V_a|, |V_b|, |V_c|$.
+  \item Run \code{pp.runpp} on the same network with the asymmetric load (it will treat it as balanced). Compare to (2). Write 4--6 sentences explaining the discrepancy.
+  \item Read \code{unbalance\_percent} from \code{res\_bus\_3ph}. This is the Voltage Unbalance Factor (VUF $= |V^{(2)}|/|V^{(1)}| \times 100\%$, IEC limit 2\%; L04 derives this). Is it above 2\%?
+\end{enumerate}
+\end{block}
+\begin{block}{Optional}
+\begin{enumerate}
+  \item Sweep the phase-A load from 10\% to 200\% of the per-phase balanced value. Plot $|V_a|, |V_b|, |V_c|$ on the same axes. At what point does $|V_a|$ cross 0.95?
+  \item Repeat (1) with a delta-connected asymmetric load instead of wye. Explain the difference.
+\end{enumerate}
+\end{block}
 \end{frame}
 
+% ============================================================
 \begin{frame}{Exit checklist}
-\TODO{Items: (1) I can state the three symmetry assumptions, (2) I can draw a one-line from a three-phase, (3) I can decide whether to use \code{runpp} or \code{runpp\_3ph}, (4) I know the connection to symmetrical components is coming in L04.}
+\begin{enumerate}
+  \item \checkitem I can draw a balanced phasor diagram and state the $a$-operator identities.
+  \item \checkitem I can list the three places where symmetry must hold for balanced PF to be valid.
+  \item \checkitem I can explain why three coupled phase equations collapse to one under balance.
+  \item \checkitem I can translate ``balanced PF'' into ``positive-sequence PF''.
+  \item \checkitem I can decide between \code{runpp} and \code{runpp\_3ph} given a description of a network.
+  \item \checkitem I can construct a numerical example where balanced PF hides a real per-phase violation.
+  \item \checkitem I am ready for L04 to fill in the sequence-domain math.
+\end{enumerate}
 \end{frame}
 
+% ============================================================
 \begin{frame}{References}
-\TODO{Grainger \& Stevenson chapter on per-phase analysis, IEC/IEEE definitions of balanced operation, pandapower ``AC Power Flow'' page.}
+\footnotesize
+\begin{itemize}
+  \item \textbf{Grainger \& Stevenson,} \emph{Power System Analysis}. Chapters on per-phase analysis and symmetrical components.
+  \item \textbf{Glover, Sarma, Overbye,} \emph{Power System Analysis and Design}. The per-phase equivalent circuit, plus a clean treatment of why the simplification works.
+  \item \textbf{Kersting,} \emph{Distribution System Modeling and Analysis}. Cases where balanced analysis breaks down in distribution.
+  \item \textbf{Fortescue, 1918.} \emph{Method of Symmetrical Co-ordinates Applied to the Solution of Polyphase Networks}, AIEE Trans. The original sequence-components paper.
+  \item \textbf{pandapower docs:} ``Balanced AC Power Flow'' and ``Asymmetric / Three-phase Power Flow'' pages.
+  \item \textbf{IEEE Std 1159-2019,} \emph{Recommended Practice for Monitoring Electric Power Quality}. VUF definitions and limits.
+\end{itemize}
 \end{frame}
 
 \end{document}

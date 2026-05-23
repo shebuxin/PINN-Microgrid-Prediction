@@ -7,15 +7,40 @@
 
 \usepackage{amsmath,amssymb,booktabs,array}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc,decorations.pathreplacing}
+\usepackage{listings}
 \usepackage{xcolor}
 \usepackage{hyperref}
 
+\definecolor{codebg}{RGB}{248,248,248}
 \definecolor{darkblue}{RGB}{0,65,120}
+\definecolor{darkgreen}{RGB}{0,105,70}
+\definecolor{warnorange}{RGB}{190,110,0}
+\definecolor{darkred}{RGB}{160,30,30}
+\definecolor{phasea}{RGB}{200,40,40}
+\definecolor{phaseb}{RGB}{40,40,180}
+\definecolor{phasec}{RGB}{20,130,40}
+
 \hypersetup{colorlinks=true,linkcolor=darkblue,urlcolor=darkblue}
 
+\lstdefinestyle{pythonstyle}{
+    language=Python,
+    basicstyle=\ttfamily\scriptsize,
+    keywordstyle=\color{darkblue}\bfseries,
+    commentstyle=\color{darkgreen},
+    stringstyle=\color{warnorange},
+    showstringspaces=false,
+    columns=fullflexible,
+    backgroundcolor=\color{codebg},
+    frame=single,
+    rulecolor=\color{black!15},
+    breaklines=true
+}
+\lstset{style=pythonstyle}
+
 \newcommand{\code}[1]{\texttt{#1}}
-\newcommand{\TODO}[1]{\textcolor{red}{\textbf{TODO:}} \emph{#1}}
+\newcommand{\checkitem}{\textcolor{darkgreen}{\Large$\checkmark$}\;}
+\newcommand{\warnitem}{\textcolor{warnorange}{\Large$\triangle$}\;}
 
 \title[L04: Unbalanced PF]{L04 -- Unbalanced (Three-phase) Power Flow}
 \subtitle{Foundations Lecture Series}
@@ -25,107 +50,730 @@
 
 \begin{document}
 
+% ============================================================
 \begin{frame}
   \titlepage
+  \vspace{-0.8em}
   \begin{center}
-    \small Keywords: symmetrical components, sequence networks, VUF, \code{runpp\_3ph}
+    \small Keywords: Fortescue transform, sequence networks, VUF, \code{runpp\_3ph}, five violation types
   \end{center}
 \end{frame}
 
 % ============================================================
 \begin{frame}{Lecture roadmap}
 \begin{enumerate}
-  \item Sources of unbalance in real networks
-  \item Symmetrical components: positive, negative, zero
-  \item Sequence networks and the Fortescue transformation
-  \item Three-phase power-flow formulation
-  \item Voltage Unbalance Factor (VUF)
-  \item \code{pp.runpp\_3ph} in practice
-  \item Why microgrid security analysis needs this lecture
+  \item Where unbalance comes from and what it does in practice
+  \item Symmetrical components: change of basis from phase to sequence
+  \item Sequence networks: three decoupled problems
+  \item Three-phase power flow formulations
+  \item A fully worked example: from single-phase load to VUF
+  \item \code{pp.runpp\_3ph} in pandapower
+  \item Five violation types and the bridge to the project
 \end{enumerate}
 \vspace{0.6em}
 \begin{block}{Prerequisite}
-L01 (PF basics), L03 (balanced assumption). L02 helpful for distribution context.
+L01 (PF basics), L03 (balanced/positive-sequence framing). L02 helpful for the distribution context.
 \end{block}
 \end{frame}
 
 % ============================================================
-\section*{1. Sources of unbalance}
+\section*{1. Sources and consequences of unbalance}
 
 \begin{frame}{Where does unbalance come from?}
-\TODO{Bulleted list with visual examples: single-phase loads, single-phase rooftop PV, EV chargers on one phase, asymmetric line geometry, untransposed lines, single-phase laterals on LV feeders.}
+\centering
+\begin{tikzpicture}[node distance=1.1cm and 1.2cm, every node/.style={font=\scriptsize}]
+\tikzset{bus/.style={draw, circle, minimum size=0.4cm, fill=blue!10}}
+\tikzset{ld/.style={draw, rounded corners, minimum width=0.55cm, minimum height=0.4cm}}
+\node[bus] (s) {S};
+\node[bus, right=of s] (b1) {};
+\node[bus, right=of b1] (b2) {};
+\node[bus, right=of b2] (b3) {};
+\node[bus, right=of b3] (b4) {};
+\node[ld, fill=phasea!25, below=0.15cm of b1] {A};
+\node[ld, fill=phasec!25, below=0.15cm of b2] {C};
+\node[ld, fill=phaseb!25, below=0.15cm of b3] {B};
+\node[ld, fill=yellow!30, above=0.15cm of b2] {PV-A};
+\node[ld, fill=yellow!30, above=0.15cm of b4] {EV-C};
+\draw[thick] (s)--(b1)--(b2)--(b3)--(b4);
+\draw (b1)--++(0,-0.18); \draw (b2)--++(0,-0.18); \draw (b3)--++(0,-0.18);
+\draw (b2)--++(0,0.18);  \draw (b4)--++(0,0.18);
+\end{tikzpicture}
+\vspace{0.4em}
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{Physical sources}
+\begin{itemize}
+  \item Single-phase residential loads
+  \item Single-phase rooftop PV
+  \item Single-phase EV chargers
+  \item Untransposed LV lines
+  \item Asymmetric line geometry
+\end{itemize}
+\column{0.5\textwidth}
+\textbf{Why these are unavoidable on LV}
+\begin{itemize}
+  \item Most homes have a single-phase service drop
+  \item Inverters are wired to the customer's phase
+  \item Transposition is rarely cost-effective at LV
+  \item Loads come and go independently per phase
+\end{itemize}
+\end{columns}
 \end{frame}
 
-\begin{frame}{What unbalance does to operations}
-\TODO{Per-phase undervoltage even when average voltage looks fine. Per-phase overload even when balanced loading is below 100\%. Neutral currents. Increased losses. Motor heating. Connect to the project's violation definitions.}
+% ============================================================
+\begin{frame}{What unbalance does in practice}
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{Per-phase quantities decouple}
+\begin{itemize}
+  \item Phase A can be under-voltage while phases B and C are fine.
+  \item One phase of a line can overload while average loading is below 100\%.
+  \item Phase angles are no longer exactly $120^\circ$ apart.
+\end{itemize}
+\column{0.5\textwidth}
+\textbf{System-level consequences}
+\begin{itemize}
+  \item Neutral conductor carries current (was zero under balance).
+  \item Increased line and transformer losses.
+  \item Three-phase induction motor heating and torque pulsation.
+  \item Single-phase protection sees different fault levels per phase.
+\end{itemize}
+\end{columns}
+\vspace{0.6em}
+\begin{alertblock}{In this course}
+The microgrid security model must \emph{see} these per-phase effects. A balanced model would silently report ``safe'' when phase A is at 0.90 pu. That is exactly the failure mode L04 fixes.
+\end{alertblock}
 \end{frame}
 
 % ============================================================
 \section*{2. Symmetrical components}
 
+\begin{frame}{The big idea: change of basis}
+We have three coupled phase quantities $(\mathbf{V}_a, \mathbf{V}_b, \mathbf{V}_c)$ that interact through line and load couplings. The math is tedious.
+\vspace{0.4em}
+
+\textbf{Symmetrical components} change basis to three new quantities $(\mathbf{V}^{(0)}, \mathbf{V}^{(1)}, \mathbf{V}^{(2)})$ that, under a mild symmetry assumption on the \emph{network} (not the loads or sources), are \emph{decoupled} from each other.
+\vspace{0.4em}
+
+\centering
+\begin{tikzpicture}[node distance=0.5cm and 0.8cm, every node/.style={font=\scriptsize}]
+\tikzset{old/.style={draw, rounded corners, fill=red!10, align=center, minimum width=2.7cm, minimum height=0.7cm}}
+\tikzset{new/.style={draw, rounded corners, fill=green!12, align=center, minimum width=2.7cm, minimum height=0.7cm}}
+\node[old] (p) {Phase domain\\$\mathbf{V}_a, \mathbf{V}_b, \mathbf{V}_c$\\(coupled)};
+\node[new, right=of p, xshift=1cm] (s) {Sequence domain\\$\mathbf{V}^{(0)}, \mathbf{V}^{(1)}, \mathbf{V}^{(2)}$\\(decoupled)};
+\draw[->, very thick] (p) -- node[above, font=\scriptsize]{Fortescue $A$} (s);
+\draw[->, very thick, dashed] (s.south) to[bend left=20] node[below, font=\scriptsize]{inverse $A^{-1}$} (p.south);
+\end{tikzpicture}
+\vspace{0.4em}
+\begin{block}{Why this is worth doing}
+Solve three small \emph{decoupled} problems instead of one big coupled one. Then transform the answer back. This is the workflow inside every three-phase PF solver, including pandapower's \code{runpp\_3ph}.
+\end{block}
+\end{frame}
+
+% ============================================================
 \begin{frame}{The Fortescue transformation}
-\TODO{Decompose any three-phase phasor set into positive-, negative-, and zero-sequence components. Define $a = e^{j2\pi/3}$ and the transformation matrix $A$. Inverse transformation. Visual: three rotating phasor sets.}
-\end{frame}
-
-\begin{frame}{Sequence networks}
-\TODO{Show how the three-phase network decouples into three independent sequence networks under linear, symmetric conditions. Mention that grounding configuration affects the zero-sequence network specifically.}
-\end{frame}
-
-% ============================================================
-\section*{3. Three-phase PF formulation}
-
-\begin{frame}{Phase-domain vs sequence-domain formulations}
-\TODO{Explain that you can either solve three coupled phase equations directly or three independent sequence equations after transformation. pandapower's \code{runpp\_3ph} uses sequence frame: positive via NR, negative and zero via current injection.}
-\end{frame}
-
-\begin{frame}{Asymmetric loads and sources}
-\TODO{Walk through how a single-phase load is modeled in pandapower with \code{create\_asymmetric\_load}, including the choice of phase A/B/C. Mirror discussion for \code{create\_asymmetric\_sgen}. Note the wye/delta connection options.}
-\end{frame}
-
-% ============================================================
-\section*{4. Voltage Unbalance Factor}
-
-\begin{frame}{Defining VUF}
-\TODO{The IEEE/IEC definition: VUF = $|V_{\text{neg}}| / |V_{\text{pos}}|$. A simpler engineering proxy: max phase voltage deviation divided by average. State the typical regulatory limit ($\sim 2\%$).}
-\end{frame}
-
-\begin{frame}{VUF as a violation in our project}
-\TODO{Forward-reference: VUF is one of the five violation types in the project's labeling (L01 of weekly material). Even when no phase is under/over voltage individually, VUF can exceed 2\% and that itself is a violation.}
-\end{frame}
-
-% ============================================================
-\section*{5. \code{runpp\_3ph} in practice}
-
-\begin{frame}{Minimal three-phase example}
-\TODO{Code: build a 3-bus unbalanced toy system in pandapower, add asymmetric loads on different phases, call \code{pp.runpp\_3ph(net)}, show \code{res\_bus\_3ph} and \code{res\_line\_3ph} columns. Compare to balanced \code{runpp} on the same system.}
-\end{frame}
-
-\begin{frame}{Reading per-phase results}
-\TODO{Walk through key columns: \code{vm\_a\_pu}, \code{vm\_b\_pu}, \code{vm\_c\_pu}, \code{unbalance\_percent}, per-phase loadings, neutral current.}
-\end{frame}
-
-\begin{frame}{What pandapower 3.x does (and does not) support}
-\TODO{Quick note: \code{runpp\_3ph} solves the sequence-frame PF for grid-connected radial / weakly-meshed networks. It does \emph{not} model islanded grid-forming inverters or droop control. State as a known limitation that the project also inherits.}
+With $a = e^{j 2\pi/3} = -\tfrac{1}{2} + j\tfrac{\sqrt{3}}{2}$:
+\begin{equation*}
+\begin{bmatrix} \mathbf{V}^{(0)} \\ \mathbf{V}^{(1)} \\ \mathbf{V}^{(2)} \end{bmatrix}
+\;=\;
+\underbrace{\frac{1}{3}\begin{bmatrix}
+1 & 1   & 1   \\
+1 & a   & a^2 \\
+1 & a^2 & a
+\end{bmatrix}}_{A^{-1}}
+\begin{bmatrix} \mathbf{V}_a \\ \mathbf{V}_b \\ \mathbf{V}_c \end{bmatrix},
+\qquad
+\begin{bmatrix} \mathbf{V}_a \\ \mathbf{V}_b \\ \mathbf{V}_c \end{bmatrix}
+\;=\;
+\underbrace{\begin{bmatrix}
+1 & 1   & 1   \\
+1 & a^2 & a   \\
+1 & a   & a^2
+\end{bmatrix}}_{A}
+\begin{bmatrix} \mathbf{V}^{(0)} \\ \mathbf{V}^{(1)} \\ \mathbf{V}^{(2)} \end{bmatrix}
+\end{equation*}
+\vspace{0.3em}
+\begin{itemize}
+  \item $\mathbf{V}^{(0)}$ -- \textbf{zero sequence}: the common-mode part. All three phases shift in unison.
+  \item $\mathbf{V}^{(1)}$ -- \textbf{positive sequence}: the balanced rotating ABC part. ``True'' balanced operation.
+  \item $\mathbf{V}^{(2)}$ -- \textbf{negative sequence}: balanced rotating ACB (opposite). A pure unbalance signal.
+\end{itemize}
+\vspace{0.3em}
+\begin{alertblock}{The same transform for currents}
+$(\mathbf{I}_a, \mathbf{I}_b, \mathbf{I}_c) \leftrightarrow (\mathbf{I}^{(0)}, \mathbf{I}^{(1)}, \mathbf{I}^{(2)})$ with the same matrix. We will apply it to load currents shortly.
+\end{alertblock}
 \end{frame}
 
 % ============================================================
-\section*{6. Why microgrids need this lecture}
-
-\begin{frame}{Connecting to the project}
-\TODO{Recap: a microgrid is LV + single-phase loads + single-phase DER + possibly islanded + needs N-1 security analysis. Every reason listed in slide 1 of L04 is present. Hence the entire project is built on \code{runpp\_3ph}.}
+\begin{frame}{Sequence components of three common patterns}
+\centering
+\small
+\begin{tabular}{lcccc}
+\toprule
+Pattern (phase domain) & $\mathbf{V}_a$ & $\mathbf{V}_b$ & $\mathbf{V}_c$ & Sequence content \\
+\midrule
+Perfectly balanced & $V$ & $a^2 V$ & $a V$ & $\mathbf{V}^{(1)} = V$ only \\
+All-A only & $V$ & 0 & 0 & $\mathbf{V}^{(0)}\!=\!\mathbf{V}^{(1)}\!=\!\mathbf{V}^{(2)}\!=\!V/3$ \\
+Two phases ($V_a\!=\!V_b\!=\!V, V_c\!=\!0$) & $V$ & $V$ & 0 & non-trivial $V^{(0,1,2)}$ \\
+Pure unbalance ($V$, $a V$, $a^2 V$) & $V$ & $a V$ & $a^2 V$ & $\mathbf{V}^{(2)} = V$ only \\
+Zero-sequence only & $V$ & $V$ & $V$ & $\mathbf{V}^{(0)} = V$ only \\
+\bottomrule
+\end{tabular}
+\vspace{0.6em}
+\begin{block}{The takeaway}
+Single-phase load $\rightarrow$ \emph{equal} positive, negative, and zero sequence parts. This is exactly why a single-phase load excites \emph{all three} sequence networks, and why the unbalanced response can be large.
+\end{block}
 \end{frame}
 
 % ============================================================
+\begin{frame}{Phasor visualization of the three sequences}
+\centering
+\begin{tikzpicture}[scale=0.85]
+% positive
+\begin{scope}[shift={(-5,0)}]
+\node[font=\scriptsize] at (0, 1.8) {\textbf{Positive ($V^{(1)}$)}};
+\draw[->, gray!40] (-1.6,0)--(1.6,0); \draw[->, gray!40] (0,-1.5)--(0,1.5);
+\draw[->, very thick, phasea] (0,0) -- ({1.2*cos(0)},{1.2*sin(0)}) node[right, font=\tiny]{a};
+\draw[->, very thick, phaseb] (0,0) -- ({1.2*cos(-120)},{1.2*sin(-120)}) node[below, font=\tiny]{b};
+\draw[->, very thick, phasec] (0,0) -- ({1.2*cos(120)},{1.2*sin(120)}) node[above, font=\tiny]{c};
+\node[font=\tiny] at (0, -1.9) {ABC, true balance};
+\end{scope}
+% negative
+\begin{scope}[shift={(0,0)}]
+\node[font=\scriptsize] at (0, 1.8) {\textbf{Negative ($V^{(2)}$)}};
+\draw[->, gray!40] (-1.6,0)--(1.6,0); \draw[->, gray!40] (0,-1.5)--(0,1.5);
+\draw[->, very thick, phasea] (0,0) -- ({0.8*cos(0)},{0.8*sin(0)}) node[right, font=\tiny]{a};
+\draw[->, very thick, phaseb] (0,0) -- ({0.8*cos(120)},{0.8*sin(120)}) node[above, font=\tiny]{b};
+\draw[->, very thick, phasec] (0,0) -- ({0.8*cos(-120)},{0.8*sin(-120)}) node[below, font=\tiny]{c};
+\node[font=\tiny] at (0, -1.9) {ACB, asymmetry signal};
+\end{scope}
+% zero
+\begin{scope}[shift={(5,0)}]
+\node[font=\scriptsize] at (0, 1.8) {\textbf{Zero ($V^{(0)}$)}};
+\draw[->, gray!40] (-1.6,0)--(1.6,0); \draw[->, gray!40] (0,-1.5)--(0,1.5);
+\draw[->, very thick, phasea] (0,-0.04) -- (0.6,-0.04);
+\draw[->, very thick, phaseb] (0, 0.00) -- (0.6, 0.00);
+\draw[->, very thick, phasec] (0, 0.04) -- (0.6, 0.04);
+\node[font=\tiny] at (0, -1.9) {common-mode};
+\end{scope}
+\end{tikzpicture}
+\vspace{0.4em}
+\begin{block}{What each picture is telling you}
+\begin{itemize}
+  \item Positive sequence is what you would draw for a healthy three-phase voltage.
+  \item Negative sequence is the same magnitude rotated the other way -- it measures how far we deviate from healthy.
+  \item Zero sequence is three phasors stacked on top of each other -- the neutral conductor or ground sees this part.
+\end{itemize}
+\end{block}
+\end{frame}
+
+% ============================================================
+\section*{3. Sequence networks}
+
+\begin{frame}{Three decoupled networks (under symmetric line geometry)}
+\centering
+\begin{tikzpicture}[node distance=0.7cm and 1.0cm, every node/.style={font=\scriptsize}]
+\tikzset{bus/.style={draw, circle, minimum size=0.45cm, fill=blue!10}}
+
+% Positive
+\begin{scope}[shift={(-5,0)}]
+\node at (0, 1.4) {\textbf{Positive network}};
+\node[bus] (a1) at (-0.8, 0) {1};
+\node[bus] (a2) at ( 0.8, 0) {2};
+\draw[very thick, phasea] (a1)--(a2) node[midway, above]{$Z^{(1)}$};
+\node[font=\tiny] at (-0.8,-0.6) {slack: $V^{(1)}_{\!1}\!=\!1$};
+\node[font=\tiny] at ( 0.8,-0.6) {injection $I^{(1)}$};
+\end{scope}
+
+% Negative
+\begin{scope}[shift={(0,0)}]
+\node at (0, 1.4) {\textbf{Negative network}};
+\node[bus] (b1) at (-0.8, 0) {1};
+\node[bus] (b2) at ( 0.8, 0) {2};
+\draw[very thick, phaseb] (b1)--(b2) node[midway, above]{$Z^{(2)}$};
+\node[font=\tiny] at (-0.8,-0.6) {slack: $V^{(2)}_{\!1}\!=\!0$};
+\node[font=\tiny] at ( 0.8,-0.6) {injection $I^{(2)}$};
+\end{scope}
+
+% Zero
+\begin{scope}[shift={(5,0)}]
+\node at (0, 1.4) {\textbf{Zero network}};
+\node[bus] (c1) at (-0.8, 0) {1};
+\node[bus] (c2) at ( 0.8, 0) {2};
+\draw[very thick, phasec] (c1)--(c2) node[midway, above]{$Z^{(0)}$};
+\node[font=\tiny] at (-0.8,-0.6) {slack: $V^{(0)}_{\!1}\!=\!0$};
+\node[font=\tiny] at ( 0.8,-0.6) {injection $I^{(0)}$};
+\end{scope}
+\end{tikzpicture}
+\vspace{0.5em}
+\begin{block}{Three things to notice}
+\begin{itemize}
+  \item Same topology in all three networks; only the impedance changes.
+  \item Only the positive network has a non-zero slack voltage (the generator is balanced).
+  \item Loads inject into all three networks if they are unbalanced; into only the positive if balanced.
+\end{itemize}
+\end{block}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Sequence impedances: where they come from}
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+Element & Typical $Z^{(0)}$ vs $Z^{(1)}$ & Why \\
+\midrule
+Transmission line, transposed & $Z^{(0)} \approx 3\text{--}5 \cdot Z^{(1)}$ & ground/earth return path is high-impedance \\
+LV cable, 4-wire & $Z^{(0)} \approx 2\text{--}4 \cdot Z^{(1)}$ & neutral conductor + ground return \\
+LV cable, 3-wire (no neutral) & $Z^{(0)}$ very large or undefined & no zero-sequence path \\
+Synchronous generator & $Z^{(0)} < Z^{(2)} < Z^{(1)}$ & depends on stator winding geometry \\
+Wye-grounded transformer & $Z^{(0)} \approx Z^{(1)}$ & ground path closes the circuit \\
+Delta or wye-ungrounded trafo & $Z^{(0)} = \infty$ & no zero-sequence path through the trafo \\
+\bottomrule
+\end{tabular}
+\vspace{0.6em}
+\begin{alertblock}{Practical rule}
+$Z^{(0)}$ is usually \emph{larger} than $Z^{(1)}$ because zero-sequence current returns through the neutral or earth. That is also why phase-to-ground faults produce different fault currents than three-phase faults. We will use $Z^{(0)} = 2\,Z^{(1)}$ in our worked example.
+\end{alertblock}
+\end{frame}
+
+% ============================================================
+\begin{frame}{The neutral conductor and zero-sequence}
+\centering
+\begin{tikzpicture}[node distance=0.4cm and 1.2cm, every node/.style={font=\scriptsize}]
+\tikzset{bus/.style={draw, circle, minimum size=0.4cm, fill=blue!10}}
+\node[bus] (a) at (0, 1.0) {}; \node[font=\tiny, left=0.1cm of a] {phase A};
+\node[bus] (b) at (0, 0.5) {}; \node[font=\tiny, left=0.1cm of b] {phase B};
+\node[bus] (c) at (0, 0.0) {}; \node[font=\tiny, left=0.1cm of c] {phase C};
+\node[bus] (n) at (0,-0.6) {}; \node[font=\tiny, left=0.1cm of n] {neutral};
+\node[bus] (aR) at (4, 1.0) {};
+\node[bus] (bR) at (4, 0.5) {};
+\node[bus] (cR) at (4, 0.0) {};
+\node[bus] (nR) at (4,-0.6) {};
+\draw[thick, phasea] (a)--(aR) node[midway, above, font=\tiny]{$I_a$};
+\draw[thick, phaseb] (b)--(bR) node[midway, above, font=\tiny]{$I_b$};
+\draw[thick, phasec] (c)--(cR) node[midway, above, font=\tiny]{$I_c$};
+\draw[thick, dashed] (n)--(nR) node[midway, below, font=\tiny]{$I_n = I_a + I_b + I_c = 3 I^{(0)}$};
+\end{tikzpicture}
+\vspace{0.5em}
+\begin{columns}[T]
+\column{0.55\textwidth}
+\textbf{Two equivalent statements}
+\begin{itemize}
+  \item Under balance, $I_a + I_b + I_c = 0$. No neutral current.
+  \item In sequence terms, $I^{(0)} = (I_a+I_b+I_c)/3 = 0$.
+\end{itemize}
+\textbf{Under unbalance,} the neutral carries $3\,I^{(0)}$. If the neutral is absent or undersized, the zero-sequence current has nowhere to go and unbalance becomes very expensive.
+\column{0.42\textwidth}
+\begin{block}{Why microgrids care}
+LV microgrid feeders often have a neutral. Single-phase loads cause $I^{(0)} \neq 0$, neutral conductors heat up, and zero-sequence voltage drift can affect every customer on the feeder.
+\end{block}
+\end{columns}
+\end{frame}
+
+% ============================================================
+\section*{4. Three-phase PF formulations}
+
+\begin{frame}{Phase domain vs sequence domain}
+\centering
+\small
+\begin{tabular}{p{0.32\textwidth} p{0.32\textwidth} p{0.32\textwidth}}
+\toprule
+ & \textbf{Phase-domain PF} & \textbf{Sequence-domain PF} \\
+\midrule
+State variables & $V_a, V_b, V_c$ at each bus & $V^{(0)}, V^{(1)}, V^{(2)}$ at each bus \\
+Network coupling & lines have full $3\times 3$ impedance matrices & three decoupled networks \\
+Loads / DER & native phase-domain representation & must transform between domains every iteration \\
+Best for & arbitrary line geometry, untransposed lines & symmetric line geometry, balanced topology with unbalanced injection \\
+Common in & Kersting, OpenDSS & pandapower, fault studies, Grainger \\
+\bottomrule
+\end{tabular}
+\vspace{0.6em}
+\begin{block}{Choosing}
+If your lines are nicely symmetric (transposed or short LV with similar phase impedances), sequence-domain is cleaner. If geometry is genuinely asymmetric, phase-domain avoids approximation. \textbf{This course uses pandapower, so we work in sequence domain.}
+\end{block}
+\end{frame}
+
+% ============================================================
+\begin{frame}{pandapower's hybrid approach}
+\code{pp.runpp\_3ph} solves the three sequence networks at every iteration, with a small twist:
+\begin{enumerate}
+  \item \textbf{Positive network} -- solved by full Newton-Raphson. This is the only network with a balanced slack source (the external grid) and PV-type generators.
+  \item \textbf{Negative network} -- solved by current injection. No internal sources; everything is driven by load and DER unbalance currents.
+  \item \textbf{Zero network} -- solved by current injection. Same logic, but with the appropriate $Z^{(0)}$ and grounding topology.
+\end{enumerate}
+\vspace{0.4em}
+\centering
+\begin{tikzpicture}[node distance=0.5cm and 1.0cm, every node/.style={font=\scriptsize}]
+\tikzset{box/.style={draw, rounded corners, align=center, minimum width=2.5cm, minimum height=0.7cm}}
+\tikzset{arr/.style={-{Latex[length=2mm]}, thick}}
+\node[box, fill=red!12] (phase) {Phase domain\\$\mathbf{S}_a, \mathbf{S}_b, \mathbf{S}_c$};
+\node[box, fill=blue!12, right=of phase] (seq) {Sequence domain\\NR + current injection};
+\node[box, fill=green!12, right=of seq] (back) {Phase domain\\$\mathbf{V}_a, \mathbf{V}_b, \mathbf{V}_c$};
+\draw[arr] (phase) -- node[above, font=\tiny]{$A^{-1}$} (seq);
+\draw[arr] (seq) -- node[above, font=\tiny]{$A$} (back);
+\end{tikzpicture}
+\vspace{0.3em}
+\begin{block}{What you see as a user}
+Just call \code{pp.runpp\_3ph(net)}. The transformations and the three-network solve happen inside.
+\end{block}
+\end{frame}
+
+% ============================================================
+\section*{5. Fully worked example}
+
+\begin{frame}{Setup: 2-bus LV feeder with a single-phase load}
+\centering
+\begin{tikzpicture}[node distance=2.0cm and 2.5cm, every node/.style={font=\scriptsize}]
+\tikzset{bus/.style={draw, circle, minimum size=0.7cm, fill=blue!10}}
+\tikzset{ld/.style={draw, rounded corners, fill=phasea!30, minimum width=1.7cm, minimum height=0.6cm}}
+\node[bus] (b1) {1};
+\node[bus, right=of b1] (b2) {2};
+\node[font=\scriptsize, above=0.2cm of b1] {balanced slack, $V_1 = 1.00 \angle 0^\circ$};
+\node[ld, below=0.4cm of b2] {$S_a = 0.4 + j0$, $S_b = S_c = 0$};
+\draw[thick] (b1) -- node[above, font=\scriptsize]{$Z^{(1)}\!=\!Z^{(2)}\!=\!0.05\!+\!j0.05$, $Z^{(0)}\!=\!0.10\!+\!j0.10$} (b2);
+\draw (b2)--++(0,-0.4);
+\end{tikzpicture}
+\vspace{0.4em}
+\textbf{All values in per-unit on a 1 MVA / 0.4 kV base.}\\[0.2em]
+The load is on phase A only; phases B and C are unloaded. The slack at bus 1 produces a perfectly balanced source. We are about to compute the voltages at bus 2 by hand, then verify with pandapower.
+\vspace{0.4em}
+\begin{block}{Strategy}
+\begin{enumerate}
+  \item Phase currents at bus 2 $\to$ sequence currents (Fortescue).
+  \item Sequence voltage drops $\to$ sequence voltages at bus 2.
+  \item Sequence voltages $\to$ phase voltages (inverse Fortescue).
+  \item Read off $|V_a|, |V_b|, |V_c|$ and compute VUF.
+\end{enumerate}
+\end{block}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Step 1 -- Phase currents to sequence currents}
+\textbf{Flat-start linear approximation:} assume $V_2 \approx 1$ so that $I_a = (S_a/V_a)^* \approx S_a$. (The constant-power feedback as $V$ drops is left to the iterative solver; we revisit in Step 4.)
+\vspace{0.3em}
+\begin{equation*}
+I_a \approx 0.4, \qquad I_b = 0, \qquad I_c = 0.
+\end{equation*}
+Apply $A^{-1}$:
+\begin{align*}
+I^{(0)} &= \tfrac{1}{3}(I_a + I_b + I_c) = \tfrac{1}{3}(0.4) = 0.1333 \\
+I^{(1)} &= \tfrac{1}{3}(I_a + a\,I_b + a^2\,I_c) = \tfrac{1}{3}(0.4) = 0.1333 \\
+I^{(2)} &= \tfrac{1}{3}(I_a + a^2\,I_b + a\,I_c) = \tfrac{1}{3}(0.4) = 0.1333
+\end{align*}
+\vspace{0.2em}
+\centering
+\small
+\begin{tabular}{lc}
+\toprule
+Sequence & Current $I^{(k)}$ (pu) \\
+\midrule
+Zero & $0.1333$ \\
+Positive & $0.1333$ \\
+Negative & $0.1333$ \\
+\bottomrule
+\end{tabular}
+\vspace{0.4em}
+\begin{block}{Observation}
+A single-phase load excites \emph{all three} sequence networks \emph{equally}. This is why ``single phase'' is the worst case for unbalance: it produces the maximum amount of negative and zero sequence current per unit of phase current.
+\end{block}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Step 2 -- Sequence voltage drops at bus 2}
+Each sequence current flows through its own sequence impedance from slack to bus 2:
+\begin{align*}
+V^{(1)}_2 &= V^{(1)}_1 - Z^{(1)} \, I^{(1)} = 1.00 - (0.05 + j0.05)(0.1333) = 0.9933 - j0.0067 \\
+V^{(2)}_2 &= 0 \;-\; Z^{(2)} \, I^{(2)} = -(0.05 + j0.05)(0.1333) = -0.0067 - j0.0067 \\
+V^{(0)}_2 &= 0 \;-\; Z^{(0)} \, I^{(0)} = -(0.10 + j0.10)(0.1333) = -0.0133 - j0.0133
+\end{align*}
+\vspace{0.3em}
+\centering
+\small
+\begin{tabular}{lcc}
+\toprule
+Sequence & $V^{(k)}_2$ (complex pu) & $|V^{(k)}_2|$ \\
+\midrule
+Zero & $-0.0133 - j0.0133$ & 0.0189 \\
+Positive & $\phantom{-}0.9933 - j0.0067$ & 0.9934 \\
+Negative & $-0.0067 - j0.0067$ & 0.0094 \\
+\bottomrule
+\end{tabular}
+\vspace{0.4em}
+\begin{alertblock}{Sanity}
+Positive-sequence voltage at bus 2 is $0.993$ pu -- which would be the answer if this were a balanced $0.133$ pu per-phase load. The negative and zero sequences are the ``cost'' of moving all of it onto phase A.
+\end{alertblock}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Step 3 -- Sequence voltages to phase voltages (linear estimate)}
+Apply $A$ (inverse Fortescue):
+\begin{align*}
+\mathbf{V}_a &= V^{(0)} + V^{(1)} + V^{(2)} \\
+             &= (-0.0133 - j0.0133) + (0.9933 - j0.0067) + (-0.0067 - j0.0067) = 0.9733 - j0.0267 \\
+\mathbf{V}_b &= V^{(0)} + a^2 V^{(1)} + a V^{(2)} = -0.5066 - j0.8726 \\
+\mathbf{V}_c &= V^{(0)} + a V^{(1)} + a^2 V^{(2)} = -0.5067 + j0.8594
+\end{align*}
+\vspace{0.3em}
+Magnitudes:
+\centering
+\small
+\begin{tabular}{lcc}
+\toprule
+Phase & $\mathbf{V}_\phi$ (complex pu) & $|\mathbf{V}_\phi|$ \\
+\midrule
+A & $\phantom{-}0.9733 - j0.0267$ & \textbf{0.974} \\
+B & $-0.5066 - j0.8726$ & \textbf{1.009} \\
+C & $-0.5067 + j0.8594$ & \textbf{0.998} \\
+\bottomrule
+\end{tabular}
+\vspace{0.4em}
+\begin{alertblock}{What the linear estimate is telling us}
+At this stage hand math says: phase A drops to $0.974$, phase B rises slightly to $1.009$, phase C stays near nominal. \emph{No phase voltage crosses the $[0.95, 1.05]$ band.} VUF (computed shortly) will also look modest.
+\\[0.3em]
+\textbf{But this is the flat-start, first-order answer.} Real loads are constant-power, so as $|V_a|$ drops, the actual current grows. We verify on the next slide.
+\end{alertblock}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Step 4 -- Verify with pandapower (constant-power, iterated)}
+Running \code{pp.runpp\_3ph} on the same network with the load modeled as constant-power (the default) and iterating to convergence:
+\vspace{0.4em}
+\centering
+\small
+\begin{tabular}{lcccc}
+\toprule
+ & $|V_a|$ & $|V_b|$ & $|V_c|$ & VUF \\
+\midrule
+Hand math (Step 3, linear flat-start) & 0.974 & 1.009 & 0.998 & 0.95\% \\
+\code{pp.runpp\_3ph} (converged) & \textbf{0.908} & \textbf{1.029} & 0.995 & \textbf{3.19\%} \\
+$\Delta$ (truth $-$ linear estimate) & $-0.066$ & $+0.020$ & $-0.003$ & $+2.24\%$ \\
+\bottomrule
+\end{tabular}
+\vspace{0.6em}
+\begin{block}{Why the linear estimate under-reports}
+As $|V_a|$ drops, a constant-power load draws \emph{more} current ($I = S/V$). More current produces more voltage drop on $Z^{(0)}$ and $Z^{(1)}$, which feeds back into a larger $V$ drop. The iteration amplifies single-phase unbalance, usually by $2$--$5\times$ on LV feeders with high R/X.
+\end{block}
+\begin{alertblock}{Take-away}
+Linear hand math gives intuition. \textbf{For safety screening, always use the iterative solver.} The project's Week 4 labeling code is exactly this: \code{runpp\_3ph} on every scenario $\times$ contingency.
+\end{alertblock}
+\end{frame}
+
+% ============================================================
+\section*{6. Voltage Unbalance Factor}
+
+\begin{frame}{VUF -- two equivalent definitions}
+\begin{block}{IEC 61000-4-30 (true VUF)}
+\begin{equation*}
+\text{VUF} \;=\; \frac{|\mathbf{V}^{(2)}|}{|\mathbf{V}^{(1)}|} \times 100\%
+\end{equation*}
+The ratio of negative-sequence to positive-sequence voltage magnitude.
+\end{block}
+\begin{block}{NEMA / engineering proxy}
+\begin{equation*}
+\text{VUF}_{\text{NEMA}} \;=\; \frac{\max_\phi |\,V_\phi\!-\!\bar{V}\,|}{\bar{V}} \times 100\%, \quad \bar{V} = \tfrac{1}{3}(|V_a|+|V_b|+|V_c|)
+\end{equation*}
+Maximum deviation from the average phase voltage, divided by the average. Easier to compute from measurements.
+\end{block}
+\vspace{0.3em}
+\centering
+\small
+\begin{tabular}{ll}
+\toprule
+Regulatory practice & Typical VUF limit \\
+\midrule
+IEC 61000-2-2 (utility-side LV) & $\le 2\%$ \\
+ANSI C84.1 (utilization voltage) & $\le 3\%$ \\
+NEMA MG1 (motor derating) & $\le 1\%$ recommended \\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+% ============================================================
+\begin{frame}{VUF on our worked example}
+\textbf{From hand math (Step 2):}
+\begin{align*}
+|\mathbf{V}^{(1)}_2| &= |0.9933 - j0.0067| \approx 0.9934 \\
+|\mathbf{V}^{(2)}_2| &= |-0.0067 - j0.0067| \approx 0.0094
+\end{align*}
+\begin{equation*}
+\text{VUF}_{\text{linear}} \;=\; \frac{0.0094}{0.9934} \times 100\% \;\approx\; \mathbf{0.95\%} \quad (\text{below 2\% limit -- no violation in linear estimate})
+\end{equation*}
+\vspace{0.2em}
+\textbf{From pandapower (Step 4):}
+\begin{equation*}
+\boxed{\;\text{VUF}_{\text{converged}} \;\approx\; \mathbf{3.19\%}\;}
+\end{equation*}
+This is above both the IEC 2\% limit \emph{and} the ANSI 3\% limit. The converged state has two simultaneous violations:
+\begin{itemize}
+  \item Phase-A undervoltage ($|V_a| = 0.908 < 0.95$).
+  \item VUF excursion ($3.19\% > 2\%$).
+\end{itemize}
+\vspace{0.2em}
+\begin{alertblock}{Why the project tracks VUF separately}
+Even when no individual phase voltage crosses its limit, a high VUF damages three-phase motors and trips sensitive equipment. The Week 4 labeling code treats VUF as a stand-alone violation type, computed from \code{res\_bus\_3ph.unbalance\_percent}.
+\end{alertblock}
+\end{frame}
+
+% ============================================================
+\section*{7. Modeling unbalanced systems in pandapower}
+
+\begin{frame}[fragile]{Asymmetric loads and sources}
+\begin{lstlisting}[language=Python]
+import pandapower as pp
+
+net = pp.create_empty_network()
+b1 = pp.create_bus(net, vn_kv=0.4)
+b2 = pp.create_bus(net, vn_kv=0.4)
+pp.create_ext_grid(net, bus=b1, vm_pu=1.0)
+pp.create_line_from_parameters(net, b1, b2, length_km=1,
+    r_ohm_per_km=0.08, x_ohm_per_km=0.08, c_nf_per_km=0.0,
+    r0_ohm_per_km=0.16, x0_ohm_per_km=0.16, c0_nf_per_km=0.0,
+    max_i_ka=0.4)
+
+# Single-phase load: 0.4 pu on phase A, zero on B and C (1 MVA base)
+pp.create_asymmetric_load(net, bus=b2,
+    p_a_mw=0.4, q_a_mvar=0.0,
+    p_b_mw=0.0, q_b_mvar=0.0,
+    p_c_mw=0.0, q_c_mvar=0.0,
+    type="wye")
+\end{lstlisting}
+\begin{block}{Key new parameters}
+\begin{itemize}
+  \item \code{r0\_ohm\_per\_km}, \code{x0\_ohm\_per\_km}: zero-sequence line parameters.
+  \item \code{create\_asymmetric\_load}: explicit per-phase $P, Q$, plus wye/delta type.
+  \item \code{create\_asymmetric\_sgen}: same idea for PV or BESS on one phase.
+\end{itemize}
+\end{block}
+\end{frame}
+
+% ============================================================
+\begin{frame}[fragile]{Running and reading the three-phase result}
+\begin{lstlisting}[language=Python]
+pp.runpp_3ph(net)
+
+print(net.res_bus_3ph[["vm_a_pu", "vm_b_pu", "vm_c_pu",
+                        "unbalance_percent"]])
+print(net.res_line_3ph[["loading_a_percent",
+                         "loading_b_percent",
+                         "loading_c_percent",
+                         "i_n_from_ka"]])
+\end{lstlisting}
+\textbf{Expected output for the worked example} (rounded):
+\vspace{0.2em}
+\centering
+\small
+\begin{tabular}{lcccc}
+\toprule
+bus & vm\_a\_pu & vm\_b\_pu & vm\_c\_pu & unbalance\_percent \\
+\midrule
+1 & 1.000 & 1.000 & 1.000 & 0.00 \\
+2 & 0.908 & 1.029 & 0.995 & 3.19 \\
+\bottomrule
+\end{tabular}
+\vspace{0.5em}
+\begin{block}{Numbers match Step 4, not Step 3}
+\code{runpp\_3ph} solves the constant-power, iterated problem and matches the converged values from Step 4. The Step-3 linear hand math underestimated the violation. Always cross-check.
+\end{block}
+\begin{alertblock}{Note on solver options}
+\code{pp.runpp\_3ph} has its own internal solver (NR on the positive network, current injection on negative and zero). It does \emph{not} accept \code{algorithm="bfsw"} -- BFSW is a balanced-PF option for \code{pp.runpp} only.
+\end{alertblock}
+\end{frame}
+
+% ============================================================
+\section*{8. The five violation types}
+
+\begin{frame}{What the project labels as a ``violation''}
+The supervised dataset built in Week 4 of the project assigns a binary label \texttt{violation} that is the logical OR of five sub-flags:
+\vspace{0.3em}
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+\# & Violation type & Detected from \\
+\midrule
+1 & Phase under- or over-voltage & \code{vm\_a\_pu}, \code{vm\_b\_pu}, \code{vm\_c\_pu} vs $[0.95, 1.05]$ \\
+2 & Line / transformer phase overload & \code{loading\_a/b/c\_percent} vs 100\% \\
+3 & Voltage unbalance factor & \code{unbalance\_percent} vs 2\% \\
+4 & Service loss & topology check: are loads still connected? \\
+5 & Non-convergence & \code{net.converged\_3ph} flag \\
+\bottomrule
+\end{tabular}
+\vspace{0.6em}
+\begin{block}{The pattern}
+The first three are read straight out of \code{runpp\_3ph}'s result tables. The fourth is a graph reachability check on the post-contingency network. The fifth is the solver's own status flag.
+\end{block}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Why this lecture is the foundation of the project}
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{Every piece of the project relies on L04}
+\begin{itemize}
+  \item Week 3 generates operating scenarios with \emph{asymmetric} loads and DER.
+  \item Week 4 runs \code{runpp\_3ph} on every scenario $\times$ contingency.
+  \item Week 4 reads phase voltages, phase loadings, VUF.
+  \item Week 5--7 train AI models to predict the label.
+  \item Week 8 evaluates recall on these specific violation types.
+\end{itemize}
+\column{0.5\textwidth}
+\begin{block}{If you only remember one thing}
+A balanced solver cannot answer microgrid security questions on an LV feeder. Every result that depends on per-phase quantities must come from \code{runpp\_3ph} or an equivalent unbalanced engine.
+\end{block}
+\end{columns}
+\vspace{0.5em}
+\begin{alertblock}{This is the rigour the AI model is asked to inherit}
+The AI screens these labels. If the AI model is to be trusted, the labels must be correct -- and ``correct'' here means \emph{exactly the kind of unbalanced analysis we just did by hand}.
+\end{alertblock}
+\end{frame}
+
+% ============================================================
+\section*{9. Recap}
+
 \begin{frame}{Homework}
-\TODO{Suggest: take a balanced 5-bus feeder, add a single-phase 2 kW load on phase A only, run both \code{runpp} and \code{runpp\_3ph}, compare per-phase voltages. Compute VUF by hand from $V_{\text{pos}}, V_{\text{neg}}$.}
+\begin{block}{Required}
+\begin{enumerate}
+  \item Reproduce the 2-bus worked example in pandapower. Verify $|V_a|, |V_b|, |V_c|$ at bus 2 match the slides to 3 decimals.
+  \item Compute VUF from \code{res\_bus\_3ph[``unbalance\_percent'']} and confirm it equals $\approx 3.19\%$.
+  \item Sweep the phase-A load from 0.05 pu to 0.65 pu in steps of 0.05. Plot $|V_a|, |V_b|, |V_c|$ on the same axes. Find the smallest load that violates \emph{any} of the five label types. Note where \code{runpp\_3ph} stops converging.
+  \item Replace the phase-A load with an \code{asymmetric\_sgen} of $0.4$ pu on phase A (i.e., single-phase PV instead of single-phase load). Recompute. Which phase now sees overvoltage?
+\end{enumerate}
+\end{block}
+\begin{block}{Optional}
+\begin{enumerate}
+  \item Vary $Z^{(0)}/Z^{(1)}$ from 1 to 10. Plot how $|V_a|$ at bus 2 changes for a fixed phase-A load. Explain.
+  \item Repeat (1) with a delta-connected asymmetric load. How does the VUF behave?
+\end{enumerate}
+\end{block}
 \end{frame}
 
+% ============================================================
 \begin{frame}{Exit checklist}
-\TODO{Items: (1) state Fortescue, (2) recognize when a problem needs \code{runpp\_3ph}, (3) compute VUF, (4) read \code{res\_bus\_3ph}, (5) explain the five violation types in the project's labeling.}
+\begin{enumerate}
+  \item \checkitem I can list the main physical sources of unbalance on an LV feeder.
+  \item \checkitem I can write the Fortescue matrix $A^{-1}$ from memory and explain what each row computes.
+  \item \checkitem I can sketch the three sequence networks for a given physical system.
+  \item \checkitem I can argue why $Z^{(0)} > Z^{(1)}$ in a typical 4-wire feeder.
+  \item \checkitem I can take phase currents $\to$ sequence currents $\to$ sequence voltages $\to$ phase voltages, by hand, on a small example.
+  \item \checkitem I can compute both IEC and NEMA VUF and apply the correct limit.
+  \item \checkitem I can call \code{pp.runpp\_3ph} and read \code{res\_bus\_3ph}.
+  \item \checkitem I can list the five violation types the project labels.
+\end{enumerate}
 \end{frame}
 
+% ============================================================
 \begin{frame}{References}
-\TODO{Fortescue 1918, Grainger \& Stevenson on symmetrical components, Kersting on three-phase distribution, pandapower ``Asymmetric / Three-phase Power Flow'' docs, IEEE Std 1159 on power quality.}
+\footnotesize
+\begin{itemize}
+  \item \textbf{Fortescue, 1918.} \emph{Method of Symmetrical Co-ordinates Applied to the Solution of Polyphase Networks}, AIEE Trans. The founding paper.
+  \item \textbf{Grainger \& Stevenson,} \emph{Power System Analysis}. Chapters on symmetrical components, sequence networks, and unbalanced faults.
+  \item \textbf{Kersting,} \emph{Distribution System Modeling and Analysis} (4th ed.). The phase-domain treatment used in OpenDSS.
+  \item \textbf{Anderson,} \emph{Analysis of Faulted Power Systems}. Deep treatment of sequence-component fault analysis.
+  \item \textbf{IEC 61000-4-30:2015,} \emph{Testing and measurement techniques -- Power quality measurement methods}. The IEC VUF definition.
+  \item \textbf{ANSI C84.1-2020,} \emph{Electric Power Systems and Equipment -- Voltage Ratings}. Voltage and unbalance limits.
+  \item \textbf{pandapower docs:} ``Asymmetric / Three-phase Power Flow'' page and the \code{runpp\_3ph} reference.
+\end{itemize}
 \end{frame}
 
 \end{document}

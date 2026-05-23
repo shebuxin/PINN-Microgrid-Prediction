@@ -7,15 +7,39 @@
 
 \usepackage{amsmath,amssymb,booktabs,array}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc,decorations.pathreplacing}
+\usepackage{listings}
 \usepackage{xcolor}
 \usepackage{hyperref}
 
+\definecolor{codebg}{RGB}{248,248,248}
 \definecolor{darkblue}{RGB}{0,65,120}
+\definecolor{darkgreen}{RGB}{0,105,70}
+\definecolor{warnorange}{RGB}{190,110,0}
+\definecolor{darkred}{RGB}{160,30,30}
+\definecolor{safecol}{RGB}{40,140,60}
+\definecolor{unsafecol}{RGB}{200,40,40}
+
 \hypersetup{colorlinks=true,linkcolor=darkblue,urlcolor=darkblue}
 
+\lstdefinestyle{pythonstyle}{
+    language=Python,
+    basicstyle=\ttfamily\scriptsize,
+    keywordstyle=\color{darkblue}\bfseries,
+    commentstyle=\color{darkgreen},
+    stringstyle=\color{warnorange},
+    showstringspaces=false,
+    columns=fullflexible,
+    backgroundcolor=\color{codebg},
+    frame=single,
+    rulecolor=\color{black!15},
+    breaklines=true
+}
+\lstset{style=pythonstyle}
+
 \newcommand{\code}[1]{\texttt{#1}}
-\newcommand{\TODO}[1]{\textcolor{red}{\textbf{TODO:}} \emph{#1}}
+\newcommand{\checkitem}{\textcolor{darkgreen}{\Large$\checkmark$}\;}
+\newcommand{\warnitem}{\textcolor{warnorange}{\Large$\triangle$}\;}
 
 \title[L05: MLP]{L05 -- Multilayer Perceptron (MLP)}
 \subtitle{Foundations Lecture Series}
@@ -25,114 +49,623 @@
 
 \begin{document}
 
+% ============================================================
 \begin{frame}
   \titlepage
+  \vspace{-0.8em}
   \begin{center}
-    \small Keywords: layers, activations, backprop, loss, train/val/test, PyTorch
+    \small Keywords: linear $\to$ nonlinear, layers, activations, backprop, train/val/test, PyTorch
   \end{center}
 \end{frame}
 
 % ============================================================
 \begin{frame}{Lecture roadmap}
 \begin{enumerate}
-  \item From linear models to MLPs
-  \item Architecture: layers, activations, output heads
+  \item Why MLPs: a problem linear models cannot solve
+  \item Anatomy of an MLP: layers, weights, activations
+  \item Output heads for classification, regression, multi-task
   \item Training: loss, backprop, gradient descent
-  \item The discipline: train/val/test, regularization, class imbalance
-  \item PyTorch minimal example
-  \item Common pitfalls
+  \item Discipline: train/val/test splits, regularization, class imbalance
+  \item A minimal PyTorch example, end to end
+  \item Common pitfalls and how the project uses MLPs
 \end{enumerate}
 \vspace{0.6em}
 \begin{block}{Prerequisite}
-Basic linear algebra (matrix-vector products, dot products) and basic calculus (partial derivatives, chain rule). Python familiarity.
+Basic linear algebra (matrix-vector products), basic calculus (partial derivatives, chain rule), and Python literacy. No prior ML experience required.
 \end{block}
 \end{frame}
 
 % ============================================================
-\section*{1. From linear models to MLPs}
+\section*{1. Why MLPs?}
 
-\begin{frame}{Why linear is not enough}
-\TODO{Show a simple example where linear classification fails (XOR or moons). State that an MLP is just a sequence of linear maps composed with nonlinearities. Visualize how stacking transforms separates the data.}
-\end{frame}
-
-\begin{frame}{The MLP equation}
-\TODO{Write the standard form: $h_{l+1} = \sigma(W_l h_l + b_l)$. Define each symbol. Show the data shape flow from input through hidden to output. Note the connection to logistic regression as the 0-hidden-layer case.}
+\begin{frame}{A toy classification problem, in our project's spirit}
+For every microgrid operating state we want to predict: \emph{will any contingency cause a violation?} A 2D toy version captures the geometry:
+\vspace{0.4em}
+\centering
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+\draw[->, thick] (-0.3,0) -- (5.0,0) node[right]{load level $x_1$};
+\draw[->, thick] (0,-0.3) -- (0,3.5) node[above]{PV level $x_2$};
+% Safe (green) cluster around (1, 1)
+\foreach \pt in {(0.6,1.0), (1.0,1.2), (1.4,0.8), (1.6,1.4), (0.8,0.6), (1.2,1.0), (0.9,1.5), (1.5,1.1), (1.1,0.9)} {
+  \fill[safecol] \pt circle (0.07);
+}
+% Unsafe (red) cluster on high load
+\foreach \pt in {(3.5,0.5), (3.8,0.9), (4.2,1.1), (4.0,0.4), (3.7,1.4), (4.3,0.7)} {
+  \fill[unsafecol] \pt circle (0.07);
+}
+% Unsafe (red) cluster on high PV
+\foreach \pt in {(0.8,2.8), (1.2,3.0), (1.6,2.6), (0.6,2.5), (1.4,2.9), (1.0,2.4)} {
+  \fill[unsafecol] \pt circle (0.07);
+}
+\node[safecol, font=\scriptsize] at (4.6, 2.2) {safe};
+\node[unsafecol, font=\scriptsize] at (4.6, 1.9) {unsafe};
+\end{tikzpicture}
+\vspace{0.3em}
+\begin{block}{The geometry}
+Two ``unsafe'' clusters: high load on the right (overload) and high PV on the top (reverse-flow voltage rise). A single straight line cannot separate them from the safe cluster in the middle.
+\end{block}
 \end{frame}
 
 % ============================================================
-\section*{2. Architecture}
+\begin{frame}{Linear classifier: what it can and cannot do}
+A linear classifier predicts $\hat{y} = \sigma(w_1 x_1 + w_2 x_2 + b)$ -- the decision boundary is a single straight line $w_1 x_1 + w_2 x_2 + b = 0$.
+\vspace{0.4em}
+\centering
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+% Same scatter
+\draw[->, thick] (-0.3,0) -- (5.0,0) node[right]{$x_1$};
+\draw[->, thick] (0,-0.3) -- (0,3.5) node[above]{$x_2$};
+\foreach \pt in {(0.6,1.0), (1.0,1.2), (1.4,0.8), (1.6,1.4), (0.8,0.6), (1.2,1.0), (0.9,1.5), (1.5,1.1), (1.1,0.9)} {
+  \fill[safecol] \pt circle (0.07);
+}
+\foreach \pt in {(3.5,0.5), (3.8,0.9), (4.2,1.1), (4.0,0.4), (3.7,1.4), (4.3,0.7)} {
+  \fill[unsafecol] \pt circle (0.07);
+}
+\foreach \pt in {(0.8,2.8), (1.2,3.0), (1.6,2.6), (0.6,2.5), (1.4,2.9), (1.0,2.4)} {
+  \fill[unsafecol] \pt circle (0.07);
+}
+% The best linear decision boundary leaves errors
+\draw[very thick, darkblue] (0.5,3.3) -- (4.8,0.0) node[right, darkblue]{linear};
+\end{tikzpicture}
+\vspace{0.3em}
+\begin{alertblock}{What's wrong}
+The best linear separator must \emph{trade off}: it can correctly classify the two unsafe clusters but only by also flagging some safe points as unsafe, or vice versa. No single line works for this geometry. Accuracy plateaus around 75\%.
+\end{alertblock}
+\end{frame}
 
+% ============================================================
+\begin{frame}{MLP: stack nonlinear layers, get a curved boundary}
+An MLP composes \emph{affine maps} with \emph{nonlinear activations}:
+\begin{equation*}
+\boxed{\;h_{l+1} \;=\; \sigma\!\left( W_l \, h_l + b_l \right), \quad l = 0, 1, \ldots, L-1\;}
+\end{equation*}
+\vspace{0.2em}
+\centering
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+\draw[->, thick] (-0.3,0) -- (5.0,0) node[right]{$x_1$};
+\draw[->, thick] (0,-0.3) -- (0,3.5) node[above]{$x_2$};
+\foreach \pt in {(0.6,1.0), (1.0,1.2), (1.4,0.8), (1.6,1.4), (0.8,0.6), (1.2,1.0), (0.9,1.5), (1.5,1.1), (1.1,0.9)} {
+  \fill[safecol] \pt circle (0.07);
+}
+\foreach \pt in {(3.5,0.5), (3.8,0.9), (4.2,1.1), (4.0,0.4), (3.7,1.4), (4.3,0.7)} {
+  \fill[unsafecol] \pt circle (0.07);
+}
+\foreach \pt in {(0.8,2.8), (1.2,3.0), (1.6,2.6), (0.6,2.5), (1.4,2.9), (1.0,2.4)} {
+  \fill[unsafecol] \pt circle (0.07);
+}
+% MLP curved boundary: wraps around safe cluster
+\draw[very thick, darkred, smooth] plot coordinates {(0.3,1.9) (0.7,2.0) (1.3,2.1) (1.9,2.0) (2.3,1.8) (2.6,1.6) (2.8,1.0) (2.5,0.4) (2.0,0.0)};
+\node[darkred, font=\scriptsize] at (4.6, 1.9) {MLP};
+\end{tikzpicture}
+\vspace{0.3em}
+\begin{block}{Why the curved boundary is possible}
+Each layer applies an affine map (so far still linear), \emph{then} a nonlinearity $\sigma(\cdot)$. Stacking these compositions builds curved decision regions. The capacity grows with depth and width.
+\end{block}
+\end{frame}
+
+% ============================================================
+\section*{2. Anatomy of an MLP}
+
+\begin{frame}{The architecture diagram}
+A 2-hidden-layer MLP for our 2D toy problem:
+\vspace{0.4em}
+\centering
+\begin{tikzpicture}[node distance=1.0cm and 1.6cm, every node/.style={font=\scriptsize}]
+\tikzset{neuron/.style={circle, draw, minimum size=0.55cm, inner sep=0pt}}
+% Input layer
+\node[neuron, fill=blue!18] (i1) at (0, 1.5) {$x_1$};
+\node[neuron, fill=blue!18] (i2) at (0, 0.5) {$x_2$};
+% Hidden 1 (4 nodes)
+\foreach \y/\name in {2.4/h11, 1.6/h12, 0.8/h13, 0.0/h14} {
+  \node[neuron, fill=warnorange!30] (\name) at (2.0, \y) {};
+}
+% Hidden 2 (4 nodes)
+\foreach \y/\name in {2.4/h21, 1.6/h22, 0.8/h23, 0.0/h24} {
+  \node[neuron, fill=warnorange!30] (\name) at (4.0, \y) {};
+}
+% Output
+\node[neuron, fill=red!18] (o) at (6.0, 1.2) {$\hat{y}$};
+% Edges input -> h1
+\foreach \src in {i1, i2} \foreach \dst in {h11, h12, h13, h14} \draw[gray!50] (\src) -- (\dst);
+% Edges h1 -> h2
+\foreach \src in {h11, h12, h13, h14} \foreach \dst in {h21, h22, h23, h24} \draw[gray!50] (\src) -- (\dst);
+% Edges h2 -> o
+\foreach \src in {h21, h22, h23, h24} \draw[gray!50] (\src) -- (o);
+\node[font=\tiny, align=center] at (0, -0.8) {Input};
+\node[font=\tiny, align=center] at (2, -0.8) {Hidden 1\\ReLU};
+\node[font=\tiny, align=center] at (4, -0.8) {Hidden 2\\ReLU};
+\node[font=\tiny, align=center] at (6, -0.8) {Output\\sigmoid};
+\end{tikzpicture}
+\vspace{0.4em}
+\begin{block}{What each piece is}
+\begin{itemize}
+  \item Each circle is a \emph{neuron}, i.e., one scalar computation $\sigma(\sum_j w_j x_j + b)$.
+  \item Each gray line is one learnable weight $w_{ij}$. Counting: $2 \cdot 4 + 4 \cdot 4 + 4 \cdot 1 = 28$ weights, plus 9 biases.
+  \item Width (e.g., 4 here) and depth (e.g., 2 hidden) are hyperparameters.
+\end{itemize}
+\end{block}
+\end{frame}
+
+% ============================================================
 \begin{frame}{Activation functions}
-\TODO{Plot and explain: sigmoid, tanh, ReLU, LeakyReLU, GELU. State practical defaults: ReLU for hidden, sigmoid/softmax for output. Note vanishing gradient problem of sigmoid in deep nets.}
+\centering
+\begin{tikzpicture}[every node/.style={font=\tiny}, scale=0.55]
+% Sigmoid
+\begin{scope}[shift={(0,0)}]
+\draw[->, gray] (-2.2,0)--(2.2,0); \draw[->, gray] (0,-0.4)--(0,2.4);
+\draw[thick, darkblue, domain=-2:2, smooth, samples=40] plot (\x, {2/(1+exp(-2*\x))});
+\node at (0, -0.8) {\textbf{sigmoid}};
+\node at (0, -1.3) {$1/(1+e^{-x})$};
+\end{scope}
+% Tanh
+\begin{scope}[shift={(5,0)}]
+\draw[->, gray] (-2.2,0)--(2.2,0); \draw[->, gray] (0,-1.4)--(0,1.4);
+\draw[thick, darkblue, domain=-2:2, smooth, samples=40] plot (\x, {tanh(\x)});
+\node at (0, -1.8) {\textbf{tanh}};
+\node at (0, -2.3) {$(e^x-e^{-x})/(e^x+e^{-x})$};
+\end{scope}
+% ReLU
+\begin{scope}[shift={(10,0)}]
+\draw[->, gray] (-2.2,0)--(2.2,0); \draw[->, gray] (0,-0.4)--(0,2.4);
+\draw[thick, darkblue] (-2,0) -- (0,0) -- (2,2);
+\node at (0, -0.8) {\textbf{ReLU}};
+\node at (0, -1.3) {$\max(0, x)$};
+\end{scope}
+% Leaky ReLU
+\begin{scope}[shift={(15,0)}]
+\draw[->, gray] (-2.2,-0.4)--(2.2,0); \draw[->, gray] (0,-0.6)--(0,2.4);
+\draw[thick, darkblue] (-2,-0.2) -- (0,0) -- (2,2);
+\node at (0, -0.8) {\textbf{leaky ReLU}};
+\node at (0, -1.3) {$\max(0.1x, x)$};
+\end{scope}
+\end{tikzpicture}
+\vspace{0.5em}
+\begin{block}{Practical defaults}
+\begin{itemize}
+  \item Hidden layers: \textbf{ReLU} (default, fast, works almost everywhere)
+  \item Binary output: \textbf{sigmoid} (squashes to $[0,1]$)
+  \item Multi-class output: \textbf{softmax}
+  \item Regression output: \textbf{identity} (no activation)
+\end{itemize}
+\end{block}
 \end{frame}
 
+% ============================================================
 \begin{frame}{Output heads for different tasks}
-\TODO{Binary classification: sigmoid + BCE. Multi-class: softmax + cross-entropy. Regression: linear + MSE. Multi-task: multiple heads. Forward-reference to PI-MLP design in Week 6 of the project.}
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+Task & Output activation & Loss \\
+\midrule
+Binary classification (safe vs unsafe) & sigmoid & binary cross-entropy (BCE) \\
+Multi-class classification (5 violation types) & softmax & cross-entropy \\
+Regression (severity score) & identity / linear & mean squared error (MSE) \\
+Ranking (top-k risk order) & identity & pairwise hinge / ranking loss \\
+\textbf{Multi-task (project's PI-MLP)} & multiple heads at once & weighted sum of the above \\
+\bottomrule
+\end{tabular}
+\vspace{0.6em}
+\begin{block}{What ``multi-task'' looks like architecturally}
+The shared layers extract a common feature representation. Then multiple heads branch off, each with its own loss. The total loss is $\mathcal{L} = \lambda_1 \mathcal{L}_{\text{cls}} + \lambda_2 \mathcal{L}_{\text{sev}} + \lambda_3 \mathcal{L}_{\text{rank}} + \ldots$. The project's Week 6 PI-MLP does exactly this.
+\end{block}
 \end{frame}
 
-\begin{frame}{Choosing depth and width}
-\TODO{Rules of thumb: start small (1--2 hidden layers, 32--128 units), increase if underfitting. Connect to bias-variance: too small underfits, too large overfits on small data. Reference the project's 77-sample regime as ``small data''.}
+% ============================================================
+\begin{frame}{Choosing width and depth}
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{Rules of thumb}
+\begin{itemize}
+  \item Start small: 1--2 hidden layers, 32--128 units.
+  \item Train. Look at train and validation loss.
+  \item Underfitting (both losses high): widen or deepen.
+  \item Overfitting (train low, val high): shrink or regularize.
+\end{itemize}
+\column{0.5\textwidth}
+\textbf{The project's regime}
+\begin{itemize}
+  \item Only 77 labeled samples.
+  \item Too much capacity $\to$ memorize the training set, generalize poorly.
+  \item Week 5/6 use small MLPs ($\sim 32$ hidden units, 2 layers) with weight decay and early stopping.
+\end{itemize}
+\end{columns}
+\vspace{0.5em}
+\begin{alertblock}{Don't reach for a 10-layer transformer}
+On a small tabular dataset like ours, simple is competitive. Modern research often finds that gradient boosting beats deep nets on small tabular data -- and that a well-tuned 2-hidden-layer MLP beats most things below 1000 samples.
+\end{alertblock}
 \end{frame}
 
 % ============================================================
 \section*{3. Training}
 
 \begin{frame}{The training loop in one slide}
-\TODO{Pseudocode: for each epoch, for each batch, (1) forward pass, (2) compute loss, (3) backward pass, (4) update parameters. Note the role of the optimizer.}
+\begin{enumerate}
+  \item Pick a minibatch of data $(X, y)$ from the training set.
+  \item \textbf{Forward pass}: compute predictions $\hat{y} = f_\theta(X)$.
+  \item \textbf{Loss}: compute $\mathcal{L}(\hat{y}, y)$ -- a scalar measuring how wrong we are.
+  \item \textbf{Backward pass}: compute $\nabla_\theta \mathcal{L}$ via the chain rule.
+  \item \textbf{Update}: $\theta \leftarrow \theta - \eta \, \nabla_\theta \mathcal{L}$ (gradient descent step).
+  \item Go to 1. Repeat for many epochs until validation loss stops improving.
+\end{enumerate}
+\vspace{0.6em}
+\begin{block}{Three knobs in this loop}
+\textbf{Batch size} (how many samples per step), \textbf{learning rate} $\eta$ (step size), and \textbf{number of epochs} (passes through the data). Tuning these is most of the practical art.
+\end{block}
 \end{frame}
 
+% ============================================================
+\begin{frame}{Common loss functions}
+\textbf{Binary classification.} Output $\hat{p} \in [0,1]$ (sigmoid), target $y \in \{0,1\}$:
+\begin{equation*}
+\mathcal{L}_{\text{BCE}} \;=\; -\bigl[y \log \hat{p} + (1-y) \log(1-\hat{p})\bigr]
+\end{equation*}
+Penalizes confident-wrong predictions heavily.
+\vspace{0.4em}
+
+\textbf{Regression.} Output $\hat{y}$, target $y$:
+\begin{equation*}
+\mathcal{L}_{\text{MSE}} \;=\; (\hat{y} - y)^2
+\end{equation*}
+\textbf{Multi-class classification.} Output probabilities $\hat{p}_k$ over $K$ classes:
+\begin{equation*}
+\mathcal{L}_{\text{CE}} \;=\; -\sum_k y_k \log \hat{p}_k
+\end{equation*}
+\vspace{0.2em}
+\begin{block}{Class-weighted BCE for imbalance}
+\begin{equation*}
+\mathcal{L}_{\text{wBCE}} = -\bigl[\,w_1 \cdot y \log \hat{p} + w_0 \cdot (1-y) \log(1-\hat{p})\bigr]
+\end{equation*}
+Set $w_1 > w_0$ if the positive (unsafe) class is rarer than the negative. The project uses this for screening recall.
+\end{block}
+\end{frame}
+
+% ============================================================
 \begin{frame}{Backpropagation in one slide}
-\TODO{Chain rule applied layer-by-layer to compute $\partial \mathcal{L} / \partial W_l$ efficiently. Note that frameworks like PyTorch compute this automatically via autograd. No need to derive gradients by hand.}
+The training step needs $\partial \mathcal{L}/\partial W_l$ for every layer. By the chain rule:
+\begin{equation*}
+\frac{\partial \mathcal{L}}{\partial W_l} \;=\; \frac{\partial \mathcal{L}}{\partial h_{L}} \cdot \frac{\partial h_{L}}{\partial h_{L-1}} \cdots \frac{\partial h_{l+1}}{\partial W_l}
+\end{equation*}
+\begin{itemize}
+  \item Each factor is a small Jacobian computable in closed form for ReLU / sigmoid / tanh / linear layers.
+  \item Multiplying them out from the output back toward the input is the ``backward pass''.
+  \item \textbf{PyTorch's autograd does this for you.} You never derive gradients by hand.
+\end{itemize}
+\vspace{0.4em}
+\begin{alertblock}{The one rule}
+You write the forward pass. Calling \code{loss.backward()} fills in \code{param.grad} for every parameter. You then call \code{optimizer.step()}. That's it -- no manual calculus.
+\end{alertblock}
 \end{frame}
 
+% ============================================================
 \begin{frame}{Optimizers: SGD, momentum, Adam}
-\TODO{Short tour: vanilla SGD, SGD with momentum, Adam. Default for this course: Adam with lr=1e-3. Mention learning-rate schedulers briefly.}
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+Optimizer & Update rule (per parameter $\theta$) & When to use \\
+\midrule
+\textbf{SGD} & $\theta \leftarrow \theta - \eta \cdot \nabla \mathcal{L}$ & simple, well-tuned baselines \\
+\textbf{SGD + momentum} & $v \leftarrow \mu v + \nabla \mathcal{L}$; $\theta \leftarrow \theta - \eta v$ & smoother trajectories \\
+\textbf{Adam} & per-parameter adaptive $\eta$ using $1^{\text{st}}$ and $2^{\text{nd}}$ moment estimates & default choice today \\
+\bottomrule
+\end{tabular}
+\vspace{0.6em}
+\begin{block}{Recommended default for this course}
+\code{torch.optim.Adam(model.parameters(), lr=1e-3)}. Works well on $\sim 90\%$ of small-to-medium problems. For very small datasets like ours, you may need to drop to $\text{lr} = 10^{-4}$ to avoid oscillation.
+\end{block}
 \end{frame}
 
 % ============================================================
-\section*{4. The discipline}
-
-\begin{frame}{Train / validation / test splits}
-\TODO{Define each, with the rule that test is touched once at the end. Validation is for hyperparameter tuning. Forward-reference: the project uses group CV (by scenario or contingency), not random splits.}
-\end{frame}
-
-\begin{frame}{Regularization: why and how}
-\TODO{L2 weight decay, dropout, early stopping. Connect to overfitting in the project's small-sample regime. Show a generic train/val loss curve with the overfitting inflection point.}
-\end{frame}
-
-\begin{frame}{Class imbalance}
-\TODO{The project's labels are 47 unsafe vs 30 safe. Discuss weighted BCE, oversampling, threshold tuning. Reinforce: in safety screening, the right metric is recall/FNR, not accuracy.}
+\begin{frame}{Learning rate: the most important hyperparameter}
+\centering
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+\draw[->, thick] (0,0) -- (5.5,0) node[right]{epoch};
+\draw[->, thick] (0,0) -- (0,3.0) node[above]{training loss};
+% Three curves: too small, just right, too large
+\draw[thick, darkblue] plot coordinates {(0,2.5) (1,2.4) (2,2.3) (3,2.2) (4,2.1) (5,2.0)};
+\node[darkblue] at (5.5, 2.0) {lr too small};
+\draw[thick, darkgreen] plot coordinates {(0,2.5) (0.5,2.0) (1,1.5) (1.5,1.0) (2,0.6) (3,0.3) (4,0.2) (5,0.15)};
+\node[darkgreen] at (5.5, 0.15) {lr just right};
+\draw[thick, darkred] plot coordinates {(0,2.5) (0.3,1.5) (0.6,2.8) (1,1.0) (1.4,2.5) (1.8,0.8) (2.3,2.7) (3,1.2) (4,2.6) (5,1.8)};
+\node[darkred] at (5.5, 1.8) {lr too large};
+\end{tikzpicture}
+\vspace{0.4em}
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{Symptoms}
+\begin{itemize}
+  \item Too small: loss barely moves.
+  \item Just right: loss drops smoothly to a plateau.
+  \item Too large: loss oscillates, may even diverge.
+\end{itemize}
+\column{0.5\textwidth}
+\textbf{Practical approach}
+\begin{itemize}
+  \item Start at $\text{lr} = 10^{-3}$ for Adam.
+  \item If loss explodes, reduce by 10$\times$.
+  \item If loss plateaus too high, increase by 3$\times$.
+  \item Optionally use a scheduler.
+\end{itemize}
+\end{columns}
 \end{frame}
 
 % ============================================================
-\section*{5. PyTorch minimal example}
+\section*{4. Training discipline}
 
-\begin{frame}{Minimal MLP in PyTorch}
-\TODO{Code block: define a 2-hidden-layer MLP with torch.nn.Sequential, instantiate optimizer (Adam), define loss (BCE), training loop. Aim for $\leq 25$ lines of code total.}
-\end{frame}
-
-\begin{frame}{Inspecting a trained model}
-\TODO{Show how to: get predictions, compute confusion matrix, plot PR curve, compute recall at a chosen threshold. Frame these as the metrics that matter in the project.}
+\begin{frame}{Train / validation / test -- and why all three}
+\centering
+\begin{tikzpicture}[node distance=0.4cm and 0.6cm, every node/.style={font=\scriptsize}]
+\tikzset{box/.style={draw, rounded corners, align=center, minimum height=0.8cm}}
+\node[box, fill=blue!10, minimum width=3.6cm] (tr) {Training (60--80\%)\\\emph{model fits these}};
+\node[box, fill=orange!12, minimum width=2.0cm, right=of tr] (vl) {Validation (10--20\%)\\\emph{tune hyperparams}};
+\node[box, fill=red!12, minimum width=1.4cm, right=of vl] (te) {Test (10--20\%)\\\emph{touch once}};
+\end{tikzpicture}
+\vspace{0.5em}
+\begin{block}{The cardinal rule}
+The \textbf{test set is touched once}, at the very end of the project, to estimate generalization. \emph{Every} hyperparameter (learning rate, hidden width, regularizer strength, decision threshold) is chosen using validation, not test.
+\end{block}
+\begin{alertblock}{Why validation is separate from test}
+If you tune on the test set, the test number becomes meaningless -- you have implicitly learned from it. The project uses \emph{group} cross-validation (by scenario and by contingency), not random splits, to avoid leakage between similar samples.
+\end{alertblock}
 \end{frame}
 
 % ============================================================
-\section*{6. Common pitfalls}
-
-\begin{frame}{Pitfalls in MLP training}
-\TODO{Enumerate: not normalizing inputs; using the wrong activation on the output head; data leakage between train and test; tuning on the test set; declaring victory based on accuracy when the data is imbalanced; forgetting to seed the RNG.}
+\begin{frame}{Overfitting and the train-val gap}
+\centering
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+\draw[->, thick] (0,0) -- (5.5,0) node[right]{epoch};
+\draw[->, thick] (0,0) -- (0,3.0) node[above]{loss};
+\draw[thick, darkblue] plot coordinates {(0,2.5) (0.5,1.7) (1,1.2) (1.5,0.8) (2,0.5) (2.5,0.35) (3,0.25) (3.5,0.2) (4,0.15) (4.5,0.12) (5,0.1)};
+\node[darkblue, font=\scriptsize] at (5.4, 0.1) {train};
+\draw[thick, darkred] plot coordinates {(0,2.5) (0.5,1.8) (1,1.3) (1.5,0.9) (2,0.7) (2.5,0.6) (3,0.62) (3.5,0.7) (4,0.85) (4.5,1.05) (5,1.25)};
+\node[darkred, font=\scriptsize] at (5.4, 1.25) {val};
+\draw[dashed, gray] (2.3,0) -- (2.3,2.8);
+\node[gray, font=\tiny] at (2.3, 2.9) {early-stop here};
+\fill[gray] (2.3, 0.6) circle (0.07);
+\end{tikzpicture}
+\vspace{0.5em}
+\begin{block}{The inflection point matters}
+Training loss keeps dropping forever; validation loss eventually starts \emph{rising}. The point where validation bottoms out is the best generalizing model. Early stopping = save the model checkpoint at that minimum.
+\end{block}
 \end{frame}
 
 % ============================================================
+\begin{frame}{The regularization toolbox}
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+Technique & Mechanism & When to reach for it \\
+\midrule
+\textbf{L2 weight decay} & add $\lambda \|\theta\|^2$ to the loss & always -- almost free \\
+\textbf{Dropout} & randomly zero out activations during training & medium / large nets \\
+\textbf{Early stopping} & stop at the val-loss minimum & always -- almost free \\
+\textbf{Data augmentation} & synthetic variations of training data & images, time series \\
+\textbf{Smaller model} & reduce width or depth & quick and effective \\
+\bottomrule
+\end{tabular}
+\vspace{0.5em}
+\begin{block}{For the project}
+\textbf{L2 weight decay + early stopping is enough.} The dataset is small enough that dropout often hurts (further reducing effective capacity). Week 5/6 notebooks use $\lambda \approx 10^{-4}$ and a patience of 30 epochs.
+\end{block}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Class imbalance and the right metric}
+The project's labeled dataset: \textbf{47 unsafe, 30 safe} (61\% positive).
+\vspace{0.3em}
+\begin{block}{Accuracy is the wrong metric}
+A model that predicts ``always unsafe'' achieves 61\% accuracy on training set. A model that's right on 9 out of 10 unsafe but wrong on every safe one achieves $\sim 75\%$ accuracy. Neither is useful.
+\end{block}
+\vspace{0.2em}
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{Right metrics for safety screening}
+\begin{itemize}
+  \item \textbf{Recall} on unsafe class
+  \item \textbf{FNR}: 1 -- recall (lower is better)
+  \item \textbf{AUPRC}: area under precision-recall curve
+  \item \textbf{Top-$k$ hit rate}: of the $k$ most-suspicious predictions, how many are truly unsafe?
+\end{itemize}
+\column{0.5\textwidth}
+\textbf{Techniques}
+\begin{itemize}
+  \item Class-weighted BCE
+  \item Decision-threshold tuning (lower threshold favours recall)
+  \item Focal loss (advanced; usually unnecessary at our scale)
+\end{itemize}
+\end{columns}
+\end{frame}
+
+% ============================================================
+\section*{5. A minimal PyTorch example}
+
+\begin{frame}[fragile]{Step 1: data and model}
+\begin{lstlisting}[language=Python]
+import torch
+import torch.nn as nn
+from sklearn.datasets import make_moons
+from sklearn.model_selection import train_test_split
+
+# Toy data: nonlinearly separable 2D binary classification
+X, y = make_moons(n_samples=400, noise=0.20, random_state=0)
+X_tr, X_va, y_tr, y_va = train_test_split(X, y, test_size=0.25, random_state=0)
+X_tr = torch.tensor(X_tr, dtype=torch.float32)
+y_tr = torch.tensor(y_tr, dtype=torch.float32).unsqueeze(1)
+X_va = torch.tensor(X_va, dtype=torch.float32)
+y_va = torch.tensor(y_va, dtype=torch.float32).unsqueeze(1)
+
+# 2 -> 32 -> 32 -> 1 MLP with sigmoid output
+model = nn.Sequential(
+    nn.Linear(2, 32),  nn.ReLU(),
+    nn.Linear(32, 32), nn.ReLU(),
+    nn.Linear(32, 1),  nn.Sigmoid(),
+)
+\end{lstlisting}
+\end{frame}
+
+% ============================================================
+\begin{frame}[fragile]{Step 2: training loop}
+\begin{lstlisting}[language=Python]
+opt   = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+bce   = nn.BCELoss()
+
+best_val = float("inf")
+for epoch in range(200):
+    # --- train ---
+    model.train()
+    opt.zero_grad()
+    loss = bce(model(X_tr), y_tr)
+    loss.backward()
+    opt.step()
+
+    # --- validate ---
+    model.eval()
+    with torch.no_grad():
+        val_loss = bce(model(X_va), y_va).item()
+
+    if val_loss < best_val:
+        best_val = val_loss
+        torch.save(model.state_dict(), "best.pt")  # early-stopping checkpoint
+\end{lstlisting}
+\begin{block}{What this does}
+One forward pass on the whole training set per epoch (full-batch, fine for $n=300$), Adam update, validation check, save best model.
+\end{block}
+\end{frame}
+
+% ============================================================
+\begin{frame}[fragile]{Step 3: evaluate and pick the decision threshold}
+\begin{lstlisting}[language=Python]
+import numpy as np
+from sklearn.metrics import confusion_matrix, precision_recall_curve, auc
+
+model.load_state_dict(torch.load("best.pt"))
+model.eval()
+with torch.no_grad():
+    p_va = model(X_va).squeeze().numpy()
+
+# Threshold to maximize recall while keeping precision >= 0.85.
+# Note: precision_recall_curve returns len(thr) = len(prec) - 1, so we align with prec[:-1].
+prec, rec, thr = precision_recall_curve(y_va.squeeze().numpy(), p_va)
+valid = prec[:-1] >= 0.85                     # aligned with thr
+threshold = thr[valid][np.argmax(rec[:-1][valid])] if valid.any() else 0.5
+
+y_pred = (p_va >= threshold).astype(int)
+tn, fp, fn, tp = confusion_matrix(y_va.squeeze().numpy(), y_pred).ravel()
+print(f"recall={tp/(tp+fn):.3f}  precision={tp/(tp+fp):.3f}  AUPRC={auc(rec, prec):.3f}")
+\end{lstlisting}
+\begin{alertblock}{Decision threshold is a hyperparameter}
+Choose it on the validation set, never on test. For screening: prefer thresholds that keep recall high (low FNR), even if precision drops -- false alarms are cheaper than missed violations.
+\end{alertblock}
+\end{frame}
+
+% ============================================================
+\section*{6. Pitfalls and the project connection}
+
+\begin{frame}{Common pitfalls in MLP training}
+\begin{enumerate}
+  \item \warnitem \textbf{Inputs not normalized.} Features with very different scales (e.g., voltage in [0.9, 1.1] vs power in [0, 100]) make optimization slow. Always standardize.
+  \item \warnitem \textbf{Wrong output activation.} Sigmoid before BCELoss, but \emph{not} before \code{BCEWithLogitsLoss}. Mixing them up either breaks training or hides bugs.
+  \item \warnitem \textbf{Data leakage} between train and test. Feature engineering on the full dataset, then splitting, leaks information. Fit scalers / encoders on train only.
+  \item \warnitem \textbf{Tuning on the test set.} You will overfit to it and report optimistic numbers.
+  \item \warnitem \textbf{Reporting accuracy on imbalanced data.} The constant predictor often gets a high accuracy. Report recall / FNR / AUPRC.
+  \item \warnitem \textbf{Forgetting to seed.} Set \code{torch.manual\_seed(0)} and the numpy and sklearn seeds to make experiments reproducible.
+\end{enumerate}
+\end{frame}
+
+% ============================================================
+\begin{frame}{How the project uses MLPs}
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{Week 5: ML baselines}
+\begin{itemize}
+  \item Plain MLP as one of several baseline classifiers.
+  \item Inputs: scenario features + contingency descriptor.
+  \item Output: binary ``will this contingency cause a violation?''
+  \item Compared against logistic regression, random forest, gradient boosting, engineering rule.
+\end{itemize}
+\column{0.5\textwidth}
+\textbf{Week 6: Physics-informed MLP}
+\begin{itemize}
+  \item Same MLP backbone, multiple output heads (classification + severity + component margins).
+  \item Loss = data BCE + physics penalty (voltage / current / VUF limit violations).
+  \item Goal: keep recall high while gaining interpretability.
+  \item Lecture L07 will develop the PI-MLP idea in detail.
+\end{itemize}
+\end{columns}
+\vspace{0.5em}
+\begin{block}{What you learn here that you reuse}
+Every concept in L05 -- architecture, training loop, regularization, class imbalance, threshold tuning -- is reused in Week 5 and Week 6 of the project. Master them on this toy 2D problem and the project notebooks become \emph{very} readable.
+\end{block}
+\end{frame}
+
+% ============================================================
+\section*{7. Recap}
+
 \begin{frame}{Homework}
-\TODO{Suggest: build a 2-hidden-layer MLP on the moons dataset, achieve 95\%+ test accuracy, plot the decision boundary, then re-train with severe class imbalance and explain why the boundary moves.}
+\begin{block}{Required}
+\begin{enumerate}
+  \item Reproduce the \code{make\_moons} example above. Verify your final validation recall and AUPRC.
+  \item Train the same MLP with random initial seeds in $\{0, 1, 2, 3, 4\}$. Report mean and stdev of recall.
+  \item Replace the toy data with a \emph{class-imbalanced} version (use \code{sklearn} to drop 80\% of one class). Re-train with \emph{plain} BCE and then with \emph{class-weighted} BCE ($w_1 = 5$). Compare recall.
+  \item Plot the trained decision boundary by evaluating the model on a $100 \times 100$ grid over $[-2, 3] \times [-1, 2]$.
+\end{enumerate}
+\end{block}
+\begin{block}{Optional}
+\begin{enumerate}
+  \item Replace ReLU with tanh. Retrain. Does anything change?
+  \item Add a third hidden layer. Does it help on this small dataset?
+  \item Implement early stopping with patience = 30 epochs and compare to fixed-200-epoch training.
+\end{enumerate}
+\end{block}
 \end{frame}
 
+% ============================================================
 \begin{frame}{Exit checklist}
-\TODO{Items: write the MLP forward equation, list 3 activation functions and when to use each, explain backprop in 2 sentences, code a training loop in PyTorch, name 3 regularizers.}
+\begin{enumerate}
+  \item \checkitem I can explain why a single linear classifier cannot solve XOR / moons.
+  \item \checkitem I can write the equation $h_{l+1} = \sigma(W_l h_l + b_l)$ and explain each symbol.
+  \item \checkitem I can pick the right output activation + loss for binary, multi-class, regression.
+  \item \checkitem I can write a PyTorch training loop in $\sim 15$ lines from memory.
+  \item \checkitem I can explain what backprop does without deriving any gradients by hand.
+  \item \checkitem I can read a train-val loss curve and identify the overfitting onset.
+  \item \checkitem I can name three reasons accuracy is the wrong metric for safety screening.
+  \item \checkitem I am ready for L06 (GNN) and Week 5/6 of the project.
+\end{enumerate}
 \end{frame}
 
+% ============================================================
 \begin{frame}{References}
-\TODO{Goodfellow et al. \emph{Deep Learning} chapter 6, Bishop \emph{Pattern Recognition and Machine Learning} chapter 5, PyTorch tutorials (\code{nn.Module} and the 60-min blitz).}
+\footnotesize
+\begin{itemize}
+  \item \textbf{Goodfellow, Bengio, Courville,} \emph{Deep Learning} (MIT Press, 2016). Chapters 6 (MLPs) and 7 (regularization). Free online.
+  \item \textbf{Bishop,} \emph{Pattern Recognition and Machine Learning} (Springer, 2006). Chapter 5 on neural networks, with a strong probabilistic flavor.
+  \item \textbf{Murphy,} \emph{Probabilistic Machine Learning: An Introduction} (MIT Press, 2022). Modern treatment, free online.
+  \item \textbf{PyTorch official tutorials:} \url{https://pytorch.org/tutorials/} -- ``Learn the Basics'' and ``60 Minute Blitz''.
+  \item \textbf{Karpathy,} \emph{A Recipe for Training Neural Networks} (blog, 2019). The single best practical guide.
+  \item \textbf{scikit-learn} documentation: \url{https://scikit-learn.org/stable/user_guide.html} for data, splits, metrics.
+\end{itemize}
 \end{frame}
 
 \end{document}

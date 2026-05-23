@@ -7,15 +7,39 @@
 
 \usepackage{amsmath,amssymb,booktabs,array}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc,decorations.pathreplacing}
+\usepackage{listings}
 \usepackage{xcolor}
 \usepackage{hyperref}
 
+\definecolor{codebg}{RGB}{248,248,248}
 \definecolor{darkblue}{RGB}{0,65,120}
+\definecolor{darkgreen}{RGB}{0,105,70}
+\definecolor{warnorange}{RGB}{190,110,0}
+\definecolor{darkred}{RGB}{160,30,30}
+\definecolor{safecol}{RGB}{40,140,60}
+\definecolor{unsafecol}{RGB}{200,40,40}
+
 \hypersetup{colorlinks=true,linkcolor=darkblue,urlcolor=darkblue}
 
+\lstdefinestyle{pythonstyle}{
+    language=Python,
+    basicstyle=\ttfamily\scriptsize,
+    keywordstyle=\color{darkblue}\bfseries,
+    commentstyle=\color{darkgreen},
+    stringstyle=\color{warnorange},
+    showstringspaces=false,
+    columns=fullflexible,
+    backgroundcolor=\color{codebg},
+    frame=single,
+    rulecolor=\color{black!15},
+    breaklines=true
+}
+\lstset{style=pythonstyle}
+
 \newcommand{\code}[1]{\texttt{#1}}
-\newcommand{\TODO}[1]{\textcolor{red}{\textbf{TODO:}} \emph{#1}}
+\newcommand{\checkitem}{\textcolor{darkgreen}{\Large$\checkmark$}\;}
+\newcommand{\warnitem}{\textcolor{warnorange}{\Large$\triangle$}\;}
 
 \title[L06: GNN]{L06 -- Graph Neural Networks (GNN)}
 \subtitle{Foundations Lecture Series}
@@ -25,110 +49,711 @@
 
 \begin{document}
 
+% ============================================================
 \begin{frame}
   \titlepage
+  \vspace{-0.8em}
   \begin{center}
-    \small Keywords: message passing, GCN, GraphSAGE, GAT, node/edge/graph-level tasks
+    \small Keywords: message passing, GCN, GraphSAGE, GAT, graph readout, oversmoothing
   \end{center}
 \end{frame}
 
 % ============================================================
 \begin{frame}{Lecture roadmap}
 \begin{enumerate}
-  \item Why graphs and why an MLP is not enough
-  \item Message passing: the core idea
+  \item Where graphs show up and why MLPs are not enough
+  \item Message passing: the one core idea
   \item Major variants: GCN, GraphSAGE, GAT
-  \item Tasks: node-level, edge-level, graph-level
-  \item Known limitations
-  \item Power-grid application preview
+  \item Three task families: node, edge, graph level
+  \item Worked example: a 4-bus feeder as a graph
+  \item Known limitations: oversmoothing, expressivity, small data
+  \item How the project's Week 7 GNN is built
 \end{enumerate}
 \vspace{0.6em}
 \begin{block}{Prerequisite}
-L05 (MLPs and PyTorch). Helpful: basic graph theory (nodes, edges, adjacency matrix).
+L05 (MLPs and PyTorch). Helpful: a vague memory of adjacency matrices and basic graph terminology (nodes, edges, neighbours).
 \end{block}
 \end{frame}
 
 % ============================================================
 \section*{1. Why graphs}
 
-\begin{frame}{Examples of graph-structured data}
-\TODO{Bullet list: molecules, citation networks, social graphs, transportation networks, \emph{power grids}. Visual of a power grid as a graph with buses=nodes, lines=edges.}
+\begin{frame}{Graph-structured data is everywhere}
+\centering
+\begin{tikzpicture}[scale=0.85]
+% Molecule
+\begin{scope}[shift={(-5.5,0)}]
+\node[circle, draw, fill=blue!18, minimum size=0.4cm] (a) at (0,0.7) {};
+\node[circle, draw, fill=blue!18, minimum size=0.4cm] (b) at (0.8,0.3) {};
+\node[circle, draw, fill=red!18, minimum size=0.4cm] (c) at (0.6,-0.6) {};
+\node[circle, draw, fill=darkgreen!40, minimum size=0.4cm] (d) at (-0.6,-0.4) {};
+\draw[thick] (a)--(b); \draw[thick] (b)--(c); \draw[thick] (c)--(d); \draw[thick] (d)--(a);
+\node[font=\scriptsize] at (0, -1.3) {\textbf{Molecule}};
+\node[font=\tiny] at (0, -1.7) {atoms / bonds};
+\end{scope}
+% Citation
+\begin{scope}[shift={(-1.5,0)}]
+\node[circle, draw, fill=warnorange!30, minimum size=0.35cm] (p1) at (0,0.6) {};
+\node[circle, draw, fill=warnorange!30, minimum size=0.35cm] (p2) at (0.8,0.4) {};
+\node[circle, draw, fill=warnorange!30, minimum size=0.35cm] (p3) at (0.3,-0.4) {};
+\node[circle, draw, fill=warnorange!30, minimum size=0.35cm] (p4) at (-0.7,-0.2) {};
+\node[circle, draw, fill=warnorange!30, minimum size=0.35cm] (p5) at (-0.3,0.9) {};
+\draw[->, thick] (p1)--(p3); \draw[->, thick] (p2)--(p1);
+\draw[->, thick] (p4)--(p3); \draw[->, thick] (p5)--(p1);
+\draw[->, thick] (p2)--(p3);
+\node[font=\scriptsize] at (0, -1.3) {\textbf{Citation network}};
+\node[font=\tiny] at (0, -1.7) {papers / citations};
+\end{scope}
+% Transport
+\begin{scope}[shift={(2.5,0)}]
+\node[circle, draw, fill=blue!18, minimum size=0.35cm] (t1) at (0,0.6) {};
+\node[circle, draw, fill=blue!18, minimum size=0.35cm] (t2) at (0.7,0.2) {};
+\node[circle, draw, fill=blue!18, minimum size=0.35cm] (t3) at (1.0,-0.5) {};
+\node[circle, draw, fill=blue!18, minimum size=0.35cm] (t4) at (-0.6,-0.3) {};
+\node[circle, draw, fill=blue!18, minimum size=0.35cm] (t5) at (-0.2,-0.8) {};
+\draw[thick] (t1)--(t2); \draw[thick] (t2)--(t3); \draw[thick] (t4)--(t5);
+\draw[thick] (t1)--(t4); \draw[thick] (t2)--(t5);
+\node[font=\scriptsize] at (0, -1.3) {\textbf{Transport network}};
+\node[font=\tiny] at (0, -1.7) {stations / roads};
+\end{scope}
+% Power grid (highlighted)
+\begin{scope}[shift={(6.5,0)}]
+\node[circle, draw, fill=darkred!18, minimum size=0.4cm, very thick] (g1) at (0,0.6) {};
+\node[circle, draw, fill=darkred!18, minimum size=0.4cm, very thick] (g2) at (0.8,0.5) {};
+\node[circle, draw, fill=darkred!18, minimum size=0.4cm, very thick] (g3) at (1.4,-0.2) {};
+\node[circle, draw, fill=darkred!18, minimum size=0.4cm, very thick] (g4) at (0.5,-0.6) {};
+\node[circle, draw, fill=darkred!18, minimum size=0.4cm, very thick] (g5) at (-0.5,-0.3) {};
+\draw[very thick] (g1)--(g2); \draw[very thick] (g2)--(g3); \draw[very thick] (g3)--(g4);
+\draw[very thick] (g4)--(g5); \draw[very thick] (g5)--(g1);
+\node[font=\scriptsize] at (0.5, -1.3) {\textbf{Power grid}};
+\node[font=\tiny] at (0.5, -1.7) {buses / lines};
+\end{scope}
+\end{tikzpicture}
+\vspace{0.5em}
+\begin{block}{The common thread}
+In each example the data has two kinds of entity: \textbf{nodes} (things) and \textbf{edges} (relationships). The interesting signal depends on \emph{which} nodes are connected, not just their individual features.
+\end{block}
 \end{frame}
 
-\begin{frame}{Why an MLP on flattened features is not enough}
-\TODO{Show how flattening a graph into a fixed-size feature vector loses topology. An MLP cannot leverage the fact that bus 3 is two hops from bus 1. Set up the need for message passing.}
+% ============================================================
+\begin{frame}{A microgrid is a graph}
+\centering
+\begin{tikzpicture}[node distance=1.4cm and 1.6cm, every node/.style={font=\scriptsize}]
+\tikzset{bus/.style={draw, circle, minimum size=0.6cm, fill=blue!12}}
+\tikzset{feat/.style={fill=warnorange!18, rounded corners, inner sep=2pt, font=\tiny, align=center}}
+\node[bus] (b1) {1};
+\node[bus, right=of b1] (b2) {2};
+\node[bus, right=of b2] (b3) {3};
+\node[bus, right=of b3] (b4) {4};
+\node[feat, above=0.5cm of b1] {$V_1 = 1.00$\\$P_1, Q_1$};
+\node[feat, above=0.5cm of b2] {$V_2$\\load A};
+\node[feat, above=0.5cm of b3] {$V_3$\\PV};
+\node[feat, above=0.5cm of b4] {$V_4$\\BESS};
+\draw[thick] (b1) -- node[below, font=\tiny]{$R\!+\!jX$} (b2);
+\draw[thick] (b2) -- node[below, font=\tiny]{$R\!+\!jX$} (b3);
+\draw[thick] (b3) -- node[below, font=\tiny]{$R\!+\!jX$} (b4);
+\end{tikzpicture}
+\vspace{0.5em}
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{Graph elements}
+\begin{itemize}
+  \item \textbf{Nodes} = buses. Each has features: $V, P, Q$, load and DER profile, scenario metadata.
+  \item \textbf{Edges} = lines / transformers. Each has features: $R, X$, rating, on/off mask.
+  \item \textbf{Graph-level} features: scenario type, time of day, contingency descriptor.
+\end{itemize}
+\column{0.5\textwidth}
+\textbf{Targets}
+\begin{itemize}
+  \item Node-level: per-bus voltage.
+  \item Edge-level: per-line loading.
+  \item \textbf{Graph-level}: ``will this state violate after any contingency?'' \emph{This is our project's task.}
+\end{itemize}
+\end{columns}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Why an MLP on flattened features falls short}
+Naive approach: take every bus's features, stack into one long vector, feed to an MLP.
+\begin{equation*}
+\mathbf{x}_{\text{flat}} = \bigl[\, h_1 \mid h_2 \mid \ldots \mid h_N \,\bigr] \in \mathbb{R}^{N \cdot d}, \qquad \hat{y} = \text{MLP}(\mathbf{x}_{\text{flat}})
+\end{equation*}
+\vspace{0.2em}
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{What the MLP cannot do}
+\begin{itemize}
+  \item It does not know that bus 3 is adjacent to bus 4 but not bus 1.
+  \item It cannot tell a 5-bus feeder from a 10-bus feeder (input size differs).
+  \item It must \emph{relearn} the relationship between adjacent buses from data.
+  \item Heavy permutation sensitivity: shuffling the bus order gives a different prediction.
+\end{itemize}
+\column{0.5\textwidth}
+\begin{block}{What we want}
+A model that takes a \emph{graph} as input directly, respects the topology, and works on any size / shape of network. That is a Graph Neural Network.
+\end{block}
+\begin{alertblock}{Project's honest baseline}
+On 77 samples, a flat-MLP often \emph{wins} simply because there isn't enough data to use the topology. We still build the GNN -- it's the right framework for scaling up.
+\end{alertblock}
+\end{columns}
 \end{frame}
 
 % ============================================================
 \section*{2. Message passing}
 
-\begin{frame}{The core idea in three steps}
-\TODO{(1) Each node has a hidden state. (2) Each node receives messages from its neighbours. (3) Each node updates its state by aggregating messages and combining with its own. Repeat for L layers. Diagram: 2-hop neighborhood.}
+\begin{frame}{Message passing in three steps}
+\centering
+\begin{tikzpicture}[node distance=0.4cm and 0.6cm, every node/.style={font=\scriptsize}]
+\tikzset{box/.style={draw, rounded corners, align=center, minimum width=2.6cm, minimum height=1.0cm}}
+\tikzset{arr/.style={-{Latex[length=2.5mm]}, thick}}
+\node[box, fill=blue!10] (a) {1. \textbf{Aggregate}\\sum / mean / max\\of neighbours};
+\node[box, fill=warnorange!18, right=of a] (b) {2. \textbf{Update}\\combine with self\\(linear $+$ ReLU)};
+\node[box, fill=darkgreen!18, right=of b] (c) {3. \textbf{Repeat}\\next layer pulls\\in 2-hop info};
+\draw[arr] (a) -- (b);
+\draw[arr] (b) -- (c);
+\draw[arr, gray] (c.south) to[bend left=30] node[below, font=\tiny]{next layer} (a.south);
+\end{tikzpicture}
+\vspace{0.6em}
+\textbf{In words.} At each layer:
+\begin{enumerate}
+  \item Each node \emph{collects} feature vectors from its neighbours.
+  \item It \emph{combines} them with its own current state via a small learned function (typically: linear layer $+$ nonlinearity).
+  \item After $L$ layers, every node has aggregated information from its $L$-hop neighbourhood.
+\end{enumerate}
+\vspace{0.4em}
+\begin{block}{The key insight}
+A GNN is just an MLP with a particular weight-tying pattern: \emph{the same small network is applied at every node, using its local neighbourhood as input.} Topology comes in through the neighbour list.
+\end{block}
 \end{frame}
 
+% ============================================================
 \begin{frame}{The general message-passing equation}
-\TODO{Write $h_v^{(l+1)} = \text{UPDATE}(h_v^{(l)}, \text{AGG}(\{h_u^{(l)} : u \in \mathcal{N}(v)\}))$. Explain each piece. Note that different choices of AGG and UPDATE give different GNN variants.}
+For each node $v$ at layer $l$:
+\begin{equation*}
+\boxed{\;h_v^{(l+1)} \;=\; \text{UPDATE}\!\left( h_v^{(l)},\; \text{AGG}\bigl(\{ h_u^{(l)} : u \in \mathcal{N}(v)\}\bigr) \right)\;}
+\end{equation*}
+\vspace{0.2em}
+\begin{columns}[T]
+\column{0.55\textwidth}
+\textbf{Common choices}
+\begin{itemize}
+  \item \textbf{AGG}: sum, mean, max, attention-weighted sum.
+  \item \textbf{UPDATE}: linear $+$ ReLU, GRU cell, MLP.
+\end{itemize}
+\textbf{Important properties}
+\begin{itemize}
+  \item AGG must be \emph{permutation-invariant} (no ``first neighbour'').
+  \item All nodes share the same weights at a given layer (parameter sharing).
+\end{itemize}
+\column{0.42\textwidth}
+\begin{block}{Different choices = different GNNs}
+The next three slides each pick a specific AGG and UPDATE: GCN, GraphSAGE, and GAT. They differ in expressivity and in how they handle different neighbourhood sizes.
+\end{block}
+\end{columns}
 \end{frame}
 
 % ============================================================
-\section*{3. Variants}
-
-\begin{frame}{GCN (Kipf \& Welling, 2017)}
-\TODO{Write the GCN equation: $H^{(l+1)} = \sigma(\tilde{D}^{-1/2} \tilde{A} \tilde{D}^{-1/2} H^{(l)} W^{(l)})$. Symmetric normalization. Note: simple, effective baseline. PyTorch Geometric implementation is one line.}
-\end{frame}
-
-\begin{frame}{GraphSAGE (Hamilton et al., 2017)}
-\TODO{Mean / max / LSTM aggregator. Inductive (handles unseen nodes), unlike vanilla GCN which is transductive. Practical choice when test graphs differ from train.}
-\end{frame}
-
-\begin{frame}{GAT (Veli\v{c}kovi\'c et al., 2018)}
-\TODO{Attention-weighted message passing. Each neighbour gets a learned attention coefficient $\alpha_{ij}$. Worth the extra parameters when some neighbours matter much more than others. Multi-head attention typically.}
+\begin{frame}{Visualizing message passing on a 4-node graph}
+\centering
+\begin{tikzpicture}[every node/.style={font=\scriptsize}, scale=1.0]
+\tikzset{node/.style={circle, draw, minimum size=0.65cm}}
+% Layer 0
+\begin{scope}[shift={(-4,0)}]
+\node[font=\scriptsize] at (1, 2.0) {\textbf{Layer 0 (input)}};
+\node[node, fill=blue!10] (n1) at (0,1) {1};
+\node[node, fill=blue!10] (n2) at (2,1.4) {2};
+\node[node, fill=blue!10] (n3) at (2,0) {3};
+\node[node, fill=blue!10] (n4) at (3.5,0.7) {4};
+\draw[thick] (n1)--(n2); \draw[thick] (n1)--(n3); \draw[thick] (n2)--(n4); \draw[thick] (n3)--(n4);
+\end{scope}
+% Layer 1: node 1 highlighted, sees 1-hop
+\begin{scope}[shift={(1.5,0)}]
+\node[font=\scriptsize] at (1, 2.0) {\textbf{Layer 1 (1-hop)}};
+\node[node, fill=warnorange!40, very thick] (m1) at (0,1) {1};
+\node[node, fill=warnorange!18] (m2) at (2,1.4) {2};
+\node[node, fill=warnorange!18] (m3) at (2,0) {3};
+\node[node, fill=blue!10] (m4) at (3.5,0.7) {4};
+\draw[->, thick, darkred] (m2)--(m1);
+\draw[->, thick, darkred] (m3)--(m1);
+\draw[thick, gray!50] (m2)--(m4); \draw[thick, gray!50] (m3)--(m4);
+\node[font=\tiny, darkred] at (0.6, 0.5) {info from $\mathcal{N}(1)$};
+\end{scope}
+\end{tikzpicture}
+\vspace{0.5em}
+\centering
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+\tikzset{node/.style={circle, draw, minimum size=0.65cm}}
+\begin{scope}[shift={(0,0)}]
+\node[font=\scriptsize] at (1, 2.0) {\textbf{Layer 2 (2-hop)}};
+\node[node, fill=warnorange!55, very thick] (p1) at (0,1) {1};
+\node[node, fill=warnorange!40] (p2) at (2,1.4) {2};
+\node[node, fill=warnorange!40] (p3) at (2,0) {3};
+\node[node, fill=warnorange!18] (p4) at (3.5,0.7) {4};
+\draw[thick] (p1)--(p2); \draw[thick] (p1)--(p3); \draw[thick] (p2)--(p4); \draw[thick] (p3)--(p4);
+\node[font=\tiny, darkred] at (4.6, 0.7) {now node 1};
+\node[font=\tiny, darkred] at (4.6, 0.4) {has 2-hop info};
+\node[font=\tiny, darkred] at (4.6, 0.1) {including node 4};
+\end{scope}
+\end{tikzpicture}
+\vspace{0.4em}
+\begin{block}{Receptive field}
+After $L$ layers, node $v$'s embedding contains information about all nodes within $L$ hops. For our 4-bus radial example, 2 or 3 layers is enough.
+\end{block}
 \end{frame}
 
 % ============================================================
-\section*{4. Tasks}
+\section*{3. Major variants}
 
-\begin{frame}{Node-level, edge-level, graph-level outputs}
-\TODO{Three task families with one example each. For our project, we mostly want \emph{graph-level} risk scores: ``does this microgrid state + contingency lead to a violation?''. Note that pooling (mean/sum/max) collapses node embeddings to a single graph vector.}
-\end{frame}
-
-\begin{frame}{The project's GNN}
-\TODO{Forward-reference: Week 7 builds a phase-aware GNN with bus nodes, line edges, contingency masks, and graph-level readout. Honest note: on 77 samples it does not beat a flat MLP. We will discuss why.}
+\begin{frame}{GCN -- Graph Convolutional Network (Kipf \& Welling, 2017)}
+The cleanest baseline. Layer-wise update:
+\begin{equation*}
+H^{(l+1)} \;=\; \sigma\!\left( \tilde{D}^{-1/2} \tilde{A} \tilde{D}^{-1/2} \, H^{(l)} \, W^{(l)} \right)
+\end{equation*}
+where
+\begin{itemize}
+  \item $\tilde{A} = A + I$ is the adjacency matrix with self-loops (so each node aggregates itself too).
+  \item $\tilde{D}$ is the diagonal degree matrix of $\tilde{A}$.
+  \item $W^{(l)}$ is a learnable weight matrix (the same MLP layer applied at every node).
+\end{itemize}
+\vspace{0.4em}
+\begin{block}{Per-node view}
+\begin{equation*}
+h_v^{(l+1)} = \sigma\!\Bigl(\, W^{(l)} \cdot \sum_{u \in \mathcal{N}(v) \cup \{v\}} \frac{1}{\sqrt{\deg(v)+1}\sqrt{\deg(u)+1}} \, h_u^{(l)} \Bigr)
+\end{equation*}
+A weighted mean of self and neighbours, then linear projection, then nonlinearity. The normalization keeps activations stable.
+\end{block}
 \end{frame}
 
 % ============================================================
-\section*{5. Limitations}
+\begin{frame}{GraphSAGE -- learnable aggregator (Hamilton et al., 2017)}
+\begin{equation*}
+h_v^{(l+1)} \;=\; \sigma\!\bigl( W^{(l)} \cdot [\, h_v^{(l)}, \;\text{AGG}(\{ h_u^{(l)} : u \in \mathcal{N}(v)\}) \,]\bigr)
+\end{equation*}
+\vspace{0.2em}
+\textbf{Key differences from GCN:}
+\begin{itemize}
+  \item Concatenate self and aggregated neighbours (not sum them).
+  \item AGG is one of: mean, max-pool, sum, LSTM.
+  \item No global normalization. Easier to apply to graphs of varying size.
+\end{itemize}
+\vspace{0.4em}
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{Inductive}
+\begin{itemize}
+  \item Trained on one graph, can be applied to \emph{unseen} graphs.
+  \item Useful when test feeders differ from training feeders.
+\end{itemize}
+\column{0.5\textwidth}
+\textbf{Practical}
+\begin{itemize}
+  \item Mean or max-pool aggregator is fast and competitive.
+  \item LSTM aggregator is more expressive but slower.
+\end{itemize}
+\end{columns}
+\end{frame}
+
+% ============================================================
+\begin{frame}{GAT -- Graph Attention Network (Veli\v{c}kovi\'c et al., 2018)}
+\begin{equation*}
+h_v^{(l+1)} \;=\; \sigma\!\Bigl( \sum_{u \in \mathcal{N}(v) \cup \{v\}} \alpha_{vu} \, W^{(l)} \, h_u^{(l)} \Bigr)
+\end{equation*}
+where $\alpha_{vu}$ is a \emph{learned attention coefficient}:
+\begin{equation*}
+\alpha_{vu} \;=\; \text{softmax}_u \bigl( \text{LeakyReLU}( a^\top [W h_v \,|\, W h_u]) \bigr)
+\end{equation*}
+\vspace{0.3em}
+\begin{columns}[T]
+\column{0.55\textwidth}
+\textbf{What this buys}
+\begin{itemize}
+  \item Each neighbour gets a learned importance weight.
+  \item Multi-head attention (run $K$ in parallel, concatenate) increases expressivity.
+  \item Works well when some neighbours matter much more than others (e.g., a heavily-loaded line).
+\end{itemize}
+\column{0.42\textwidth}
+\begin{block}{Cost}
+More parameters, more computation, more risk of overfitting on small graphs. Use when GCN / SAGE underperform and you have the data to support it.
+\end{block}
+\end{columns}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Picking a variant: rough guide}
+\centering
+\small
+\begin{tabular}{lcccc}
+\toprule
+ & \textbf{GCN} & \textbf{GraphSAGE} & \textbf{GAT} & \textbf{Plain MLP} \\
+\midrule
+Topology-aware & \checkitem & \checkitem & \checkitem & --- \\
+Inductive (unseen graphs) & no & \checkitem & \checkitem & yes (with fixed input size) \\
+Edge features used naturally & limited & limited & limited & --- \\
+Parameter count & smallest & small & medium & smallest \\
+Best on small data ($<$ 1k samples) & often & often & rarely & competitive \\
+Best on large data ($>$ 100k) & ok & good & best & limited \\
+\bottomrule
+\end{tabular}
+\vspace{0.7em}
+\begin{block}{For the project}
+Week 7 uses a GCN-style backbone, customised with per-phase bus channels and a contingency mask. Plain MLP is the comparison baseline. We do \emph{not} use GAT -- 77 samples cannot support its parameter count.
+\end{block}
+\end{frame}
+
+% ============================================================
+\section*{4. Task types}
+
+\begin{frame}{Node-level, edge-level, graph-level}
+\centering
+\begin{tikzpicture}[every node/.style={font=\scriptsize}, scale=0.9]
+\tikzset{n/.style={circle, draw, minimum size=0.5cm, inner sep=0pt}}
+% Node-level
+\begin{scope}[shift={(-5,0)}]
+\node[font=\scriptsize] at (1, 2.0) {\textbf{Node-level}};
+\node[n, fill=safecol!40] (a1) at (0,1) {};
+\node[n, fill=safecol!40] (a2) at (2,1.3) {};
+\node[n, fill=unsafecol!40] (a3) at (2,-0.1) {};
+\node[n, fill=safecol!40] (a4) at (3,0.7) {};
+\draw[thick] (a1)--(a2); \draw[thick] (a1)--(a3); \draw[thick] (a2)--(a4); \draw[thick] (a3)--(a4);
+\node[font=\tiny] at (1.5, -0.9) {predict per-bus voltage};
+\end{scope}
+% Edge-level
+\begin{scope}[shift={(0,0)}]
+\node[font=\scriptsize] at (1, 2.0) {\textbf{Edge-level}};
+\node[n, fill=blue!18] (b1) at (0,1) {};
+\node[n, fill=blue!18] (b2) at (2,1.3) {};
+\node[n, fill=blue!18] (b3) at (2,-0.1) {};
+\node[n, fill=blue!18] (b4) at (3,0.7) {};
+\draw[very thick, unsafecol] (b1)--(b2);
+\draw[very thick, safecol] (b1)--(b3);
+\draw[thick] (b2)--(b4); \draw[thick] (b3)--(b4);
+\node[font=\tiny] at (1.5, -0.9) {predict per-line loading};
+\end{scope}
+% Graph-level
+\begin{scope}[shift={(5,0)}]
+\node[font=\scriptsize] at (1, 2.0) {\textbf{Graph-level (project)}};
+\node[n, fill=blue!18] (c1) at (0,1) {};
+\node[n, fill=blue!18] (c2) at (2,1.3) {};
+\node[n, fill=blue!18] (c3) at (2,-0.1) {};
+\node[n, fill=blue!18] (c4) at (3,0.7) {};
+\draw[thick] (c1)--(c2); \draw[thick] (c1)--(c3); \draw[thick] (c2)--(c4); \draw[thick] (c3)--(c4);
+\draw[draw=unsafecol, very thick, dashed, rounded corners] (-0.4, -0.5) rectangle (3.4, 1.7);
+\node[unsafecol, font=\tiny] at (1.5, -0.9) {predict ``violation'' label};
+\end{scope}
+\end{tikzpicture}
+\vspace{0.5em}
+\begin{block}{All three use the same backbone}
+The GNN computes node embeddings. The \emph{readout head} on top determines the task: per-node MLP, per-edge MLP, or a graph pooling layer followed by an MLP. We will use the third for the project.
+\end{block}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Pooling to graph-level}
+After $L$ layers we have an embedding $h_v$ at every node. To produce a single graph-level prediction:
+\begin{equation*}
+\mathbf{z}_G \;=\; \text{POOL}(\{h_v : v \in V\}), \qquad \hat{y} \;=\; \text{MLP}(\mathbf{z}_G)
+\end{equation*}
+\vspace{0.2em}
+Common POOL choices:
+\begin{itemize}
+  \item \textbf{mean pool}: $\mathbf{z}_G = \tfrac{1}{|V|} \sum_v h_v$ -- bias toward typical bus state.
+  \item \textbf{max pool}: $\mathbf{z}_G = \max_v h_v$ (elementwise) -- bias toward worst-case bus.
+  \item \textbf{sum pool}: $\mathbf{z}_G = \sum_v h_v$ -- preserves overall magnitude.
+  \item \textbf{attention pool}: learned weights $\alpha_v$ over nodes.
+\end{itemize}
+\vspace{0.3em}
+\begin{alertblock}{For safety screening, max-pool is a sensible default}
+The graph is unsafe \emph{if any one bus} crosses a limit. Max-pool naturally captures this ``worst case wins'' logic. Mean-pool can hide one bad bus by averaging it with many good ones.
+\end{alertblock}
+\end{frame}
+
+% ============================================================
+\section*{5. Worked example -- 4-bus feeder}
+
+\begin{frame}{Setup: a feeder, its features, and the task}
+\centering
+\begin{tikzpicture}[node distance=1.3cm and 1.6cm, every node/.style={font=\scriptsize}]
+\tikzset{bus/.style={draw, circle, minimum size=0.55cm, fill=blue!12}}
+\tikzset{feat/.style={fill=warnorange!18, rounded corners, inner sep=2pt, font=\tiny, align=center, minimum width=1.5cm}}
+\node[bus] (b1) {1};
+\node[bus, right=of b1] (b2) {2};
+\node[bus, right=of b2] (b3) {3};
+\node[bus, right=of b3] (b4) {4};
+\node[feat, above=0.5cm of b1] {$h_1 = (1.00, 0.0, 0.0)$};
+\node[feat, above=0.5cm of b2] {$h_2 = (0.98, 0.10, 0.04)$};
+\node[feat, above=0.5cm of b3] {$h_3 = (0.97, 0.15, 0.06)$};
+\node[feat, above=0.5cm of b4] {$h_4 = (0.95, 0.20, 0.08)$};
+\draw[thick] (b1)--(b2); \draw[thick] (b2)--(b3); \draw[thick] (b3)--(b4);
+\end{tikzpicture}
+\vspace{0.3em}
+\begin{itemize}
+  \item Each node has feature $h_v = (V_v, P_v, Q_v)$ -- voltage and net injection.
+  \item Edges have features $(R, X)$ -- omitted for the cleanest derivation.
+  \item Task: predict a single binary label ``violation after any contingency''.
+\end{itemize}
+\vspace{0.3em}
+\begin{block}{Strategy}
+2 GCN layers $\to$ max-pool node embeddings $\to$ MLP head $\to$ sigmoid. Train with BCE on labeled scenarios.
+\end{block}
+\end{frame}
+
+% ============================================================
+\begin{frame}{One GCN layer, by hand}
+Using the simplified mean aggregator (close enough to GCN for intuition):
+\begin{equation*}
+h_v^{(1)} \;=\; \sigma\!\Bigl(\, W \cdot \frac{1}{|\mathcal{N}(v)| + 1} \sum_{u \in \mathcal{N}(v) \cup \{v\}} h_u^{(0)} \Bigr)
+\end{equation*}
+\vspace{0.2em}
+For node 2, $\mathcal{N}(2) = \{1, 3\}$. The aggregated input (mean of itself, node 1, node 3) is:
+\begin{equation*}
+\bar{h}_2 = \tfrac{1}{3}\bigl( (0.98, 0.10, 0.04) + (1.00, 0.0, 0.0) + (0.97, 0.15, 0.06) \bigr) = (0.983,\; 0.083,\; 0.033)
+\end{equation*}
+The learnable matrix $W$ then maps this 3-vector to a hidden representation (e.g., 16-dim), and $\sigma = $ ReLU.
+\vspace{0.4em}
+\begin{block}{What just happened}
+Node 2's new embedding $h_2^{(1)}$ \emph{depends on its neighbours' features}. After one layer it knows about nodes 1 and 3 (1-hop neighbourhood). After two layers it will also know about node 4 (via node 3).
+\end{block}
+\end{frame}
+
+% ============================================================
+\begin{frame}{After two layers + pooling, we get a risk score}
+\centering
+\begin{tikzpicture}[node distance=0.5cm and 0.8cm, every node/.style={font=\scriptsize}]
+\tikzset{box/.style={draw, rounded corners, align=center, minimum width=2.6cm, minimum height=0.9cm}}
+\tikzset{arr/.style={-{Latex[length=2.5mm]}, thick}}
+\node[box, fill=blue!10] (in) {Node features\\$h_v^{(0)} \in \mathbb{R}^3$};
+\node[box, fill=warnorange!18, right=of in] (g1) {GCN layer 1\\$\to \mathbb{R}^{16}$};
+\node[box, fill=warnorange!18, right=of g1] (g2) {GCN layer 2\\$\to \mathbb{R}^{16}$};
+\node[box, fill=darkgreen!18, right=of g2] (pool) {Max pool\\$\to \mathbf{z}_G \in \mathbb{R}^{16}$};
+\node[box, fill=red!12, right=of pool] (head) {MLP head\\sigmoid $\to \hat{y}$};
+\draw[arr] (in)--(g1); \draw[arr] (g1)--(g2); \draw[arr] (g2)--(pool); \draw[arr] (pool)--(head);
+\end{tikzpicture}
+\vspace{0.5em}
+\begin{columns}[T]
+\column{0.55\textwidth}
+\textbf{End-to-end forward pass}
+\begin{itemize}
+  \item Node features in $\mathbb{R}^{N \times 3}$.
+  \item After 2 GCN layers: $\mathbb{R}^{N \times 16}$ embeddings.
+  \item After max-pool over nodes: a single $\mathbb{R}^{16}$ graph vector.
+  \item MLP head with sigmoid: scalar risk score $\hat{y} \in [0,1]$.
+\end{itemize}
+\column{0.42\textwidth}
+\begin{block}{Training}
+Same as L05: minibatch of (graph, label) pairs, BCE loss, Adam, early stop on validation. Use class-weighted BCE for the project's $47/30$ imbalance.
+\end{block}
+\end{columns}
+\end{frame}
+
+% ============================================================
+\begin{frame}[fragile]{In code: plain PyTorch vs PyTorch Geometric}
+\begin{lstlisting}[language=Python]
+# Option A: PyTorch Geometric (production standard)
+import torch.nn as nn
+from torch_geometric.nn import GCNConv, global_max_pool
+
+class GridGNN(nn.Module):
+    def __init__(self, in_dim=3, hidden=16):
+        super().__init__()
+        self.g1   = GCNConv(in_dim,  hidden)
+        self.g2   = GCNConv(hidden, hidden)
+        self.head = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(),
+                                  nn.Linear(hidden, 1),     nn.Sigmoid())
+    def forward(self, x, edge_index, batch):
+        h = self.g1(x, edge_index).relu()
+        h = self.g2(h, edge_index).relu()
+        z = global_max_pool(h, batch)          # batch indicates which graph each node belongs to
+        return self.head(z)
+\end{lstlisting}
+\begin{alertblock}{What the project actually uses}
+The Week 7 notebook implements the GCN-style message passing in \emph{plain PyTorch} (no PyG dependency) so students can read every line. Same math, more lines of code, no extra install.
+\end{alertblock}
+\end{frame}
+
+% ============================================================
+\section*{6. Known limitations}
 
 \begin{frame}{Oversmoothing}
-\TODO{After many layers, all node embeddings converge to the same vector. Limits effective depth to 2--4 layers. Mitigations: residual connections, GraphSAGE max-pool, recent ``deep GNN'' research.}
-\end{frame}
-
-\begin{frame}{Expressivity bounds}
-\TODO{Brief note on the Weisfeiler-Lehman test and what GNNs can/cannot distinguish. Show two non-isomorphic graphs that a standard GNN cannot tell apart. Caveat: not load-bearing for our application, but good to know.}
-\end{frame}
-
-\begin{frame}{Small-data behavior}
-\TODO{GNNs typically need more data than MLPs to show their value, because the message-passing weights are shared across graphs. On 77 samples, MLPs often win. Connect to the project's honest negative result.}
+\centering
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+\tikzset{n/.style={circle, draw, minimum size=0.45cm, inner sep=0pt}}
+% Layer 1: distinct
+\begin{scope}[shift={(-5,0)}]
+\node[font=\scriptsize] at (1, 1.7) {\textbf{Layer 1}};
+\node[n, fill=safecol!50] (a) at (0,1) {};
+\node[n, fill=warnorange!50] (b) at (1,1.3) {};
+\node[n, fill=darkred!40] (c) at (2,0.8) {};
+\node[n, fill=darkblue!40] (d) at (1,0) {};
+\draw[thick] (a)--(b)--(c)--(d)--(a);
+\node[font=\tiny] at (1, -0.5) {distinct embeddings};
+\end{scope}
+\begin{scope}[shift={(0,0)}]
+\node[font=\scriptsize] at (1, 1.7) {\textbf{Layer 4}};
+\node[n, fill=warnorange!35] (a) at (0,1) {};
+\node[n, fill=warnorange!35] (b) at (1,1.3) {};
+\node[n, fill=warnorange!35] (c) at (2,0.8) {};
+\node[n, fill=warnorange!35] (d) at (1,0) {};
+\draw[thick] (a)--(b)--(c)--(d)--(a);
+\node[font=\tiny] at (1, -0.5) {converging};
+\end{scope}
+\begin{scope}[shift={(5,0)}]
+\node[font=\scriptsize] at (1, 1.7) {\textbf{Layer 10+}};
+\node[n, fill=warnorange!22] (a) at (0,1) {};
+\node[n, fill=warnorange!22] (b) at (1,1.3) {};
+\node[n, fill=warnorange!22] (c) at (2,0.8) {};
+\node[n, fill=warnorange!22] (d) at (1,0) {};
+\draw[thick] (a)--(b)--(c)--(d)--(a);
+\node[font=\tiny] at (1, -0.5) {all identical};
+\end{scope}
+\end{tikzpicture}
+\vspace{0.5em}
+\begin{block}{What's happening}
+Each layer mixes a node with its neighbours. After many layers, every node's embedding becomes a global average -- node identity is washed out.
+\end{block}
+\begin{alertblock}{Practical advice}
+Limit depth to 2--4 layers for most problems. If you need deeper, use residual connections, jumping knowledge, or DropEdge.
+\end{alertblock}
 \end{frame}
 
 % ============================================================
-\section*{6. Power-grid application preview}
-
-\begin{frame}{What a power-grid GNN looks like}
-\TODO{Walk through: nodes = buses, edges = lines/transformers, node features = per-phase load/PV/voltage, edge features = R/X/rating, global features = scenario metadata, output = graph-level risk score. This is the Week 7 architecture.}
+\begin{frame}{Expressivity bounds (Weisfeiler-Lehman)}
+\centering
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+\tikzset{n/.style={circle, draw, minimum size=0.4cm, inner sep=0pt, fill=blue!20}}
+% Two non-isomorphic graphs that 1-WL cannot distinguish
+\begin{scope}[shift={(-3.5,0)}]
+\node[font=\scriptsize] at (1, 2.0) {\textbf{Graph A}};
+\node[n] (a1) at (0,1.4) {}; \node[n] (a2) at (2,1.4) {};
+\node[n] (a3) at (0,0) {}; \node[n] (a4) at (2,0) {};
+\node[n] (a5) at (1,2.2) {}; \node[n] (a6) at (1,-0.8) {};
+\draw[thick] (a1)--(a2)--(a4)--(a3)--(a1);
+\draw[thick] (a5)--(a1); \draw[thick] (a5)--(a2);
+\draw[thick] (a6)--(a3); \draw[thick] (a6)--(a4);
+\end{scope}
+\begin{scope}[shift={(3.5,0)}]
+\node[font=\scriptsize] at (1, 2.0) {\textbf{Graph B}};
+\node[n] (b1) at (0,1.4) {}; \node[n] (b2) at (2,1.4) {};
+\node[n] (b3) at (0,0) {}; \node[n] (b4) at (2,0) {};
+\node[n] (b5) at (1,2.2) {}; \node[n] (b6) at (1,-0.8) {};
+\draw[thick] (b1)--(b2); \draw[thick] (b3)--(b4); \draw[thick] (b1)--(b3); \draw[thick] (b2)--(b4);
+\draw[thick] (b5)--(b3); \draw[thick] (b5)--(b4);
+\draw[thick] (b6)--(b1); \draw[thick] (b6)--(b2);
+\end{scope}
+\end{tikzpicture}
+\vspace{0.5em}
+\begin{block}{The take-away}
+Standard GNNs (GCN / GraphSAGE / GAT) are as powerful as the 1-WL graph isomorphism test. There exist non-isomorphic graphs they \emph{cannot} distinguish. Advanced architectures (higher-order WL, structural features) push this further. For our project's needs, 1-WL expressivity is enough.
+\end{block}
 \end{frame}
 
 % ============================================================
+\begin{frame}{Small-data behavior: an honest finding from the project}
+\centering
+\small
+\begin{tabular}{lcc}
+\toprule
+Holdout model (Week 7 of the project) & Recall & PF calls saved \\
+\midrule
+GradientBoosting (ML baseline) & 1.000 & 0.400 \\
+PI-MLP (full physics loss) & 1.000 & 0.400 \\
+FlattenedMLP (topology-blind) & 1.000 & 0.400 \\
+\textbf{PhaseAwareGNN} & \textbf{0.583} & 0.600 \\
+\bottomrule
+\end{tabular}
+\vspace{0.5em}
+\begin{columns}[T]
+\column{0.55\textwidth}
+\textbf{Why GNN loses here}
+\begin{itemize}
+  \item Only 77 labeled scenarios.
+  \item GNN parameter sharing helps when graph diversity is high -- but we have one feeder.
+  \item Flat MLP can memorize 77 patterns; GNN has stronger inductive bias that doesn't pay off at this scale.
+\end{itemize}
+\column{0.42\textwidth}
+\begin{alertblock}{We still build the GNN}
+The architecture is right; the dataset is too small. Scale to hundreds of feeders and the picture inverts. This is a real lesson about how AI choices depend on data regime, not just method elegance.
+\end{alertblock}
+\end{columns}
+\end{frame}
+
+% ============================================================
+\section*{7. Project's phase-aware GNN}
+
+\begin{frame}{Week 7's phase-aware GNN at a high level}
+\centering
+\begin{tikzpicture}[node distance=0.5cm and 0.7cm, every node/.style={font=\scriptsize}]
+\tikzset{box/.style={draw, rounded corners, align=center, minimum width=2.3cm, minimum height=0.7cm}}
+\tikzset{arr/.style={-{Latex[length=2.5mm]}, thick}}
+\node[box, fill=blue!12]    (n) {Node features\\$V_a, V_b, V_c, P, Q, \ldots$};
+\node[box, fill=blue!12, below=of n]    (e) {Edge features\\$R, X, R_0, X_0$};
+\node[box, fill=blue!12, below=of e]    (m) {Contingency mask\\(per element)};
+\node[box, fill=blue!12, below=of m]    (s) {Global scenario\\features};
+\node[box, fill=warnorange!22, right=2.0cm of e] (gnn) {GCN backbone\\(2--3 layers)};
+\node[box, fill=darkgreen!22, right=of gnn] (rd) {Max + mean\\readout};
+\node[box, fill=red!12, right=of rd] (h) {MLP head\\sigmoid};
+\node[box, fill=red!18, right=of h] (out) {Risk score\\$\hat{y} \in [0,1]$};
+\draw[arr] (n.east) to[bend left=8] (gnn.west);
+\draw[arr] (e.east) -- (gnn.west);
+\draw[arr] (m.east) -- (gnn.west);
+\draw[arr] (s.east) to[bend right=8] (rd.west);
+\draw[arr] (gnn) -- (rd);
+\draw[arr] (rd) -- (h);
+\draw[arr] (h) -- (out);
+\end{tikzpicture}
+\vspace{0.4em}
+\begin{block}{What is ``phase-aware''}
+Each bus carries \emph{three} voltage channels ($V_a, V_b, V_c$) instead of one balanced positive-sequence voltage. The same node-feature vector contains phase-A, B, C quantities together, so the GNN learns from the unbalance pattern directly.
+\end{block}
+\begin{alertblock}{Reading the project notebook}
+With L05 (PyTorch) + L06 (message passing) in hand, the Week 7 notebook is now within reach. Don't skip the validation cells -- they verify graph construction, mask correctness, and per-phase consistency.
+\end{alertblock}
+\end{frame}
+
+% ============================================================
+\section*{8. Recap}
+
 \begin{frame}{Homework}
-\TODO{Suggest: implement a 2-layer GCN on Cora citation network with PyTorch Geometric, achieve $>$80\% test accuracy. Then visualize node embeddings with t-SNE before and after training.}
+\begin{block}{Required}
+\begin{enumerate}
+  \item Train a 2-layer GCN on the Cora citation dataset using PyTorch Geometric (or plain PyTorch). Achieve $\geq 80\%$ test accuracy on node classification.
+  \item Visualize the learned node embeddings with t-SNE (or PCA) at layer 1 and layer 2. Are the classes separating?
+  \item Replace GCN with GraphSAGE (mean aggregator). Compare test accuracy. Run each with 3 seeds and report mean / stdev.
+  \item Implement a tiny graph-level classifier: 4-bus feeder graphs labeled by your own rule (e.g.\ unsafe if $V_{\min} < 0.95$). Train a 2-layer GCN with max-pool readout. Report recall on a held-out set.
+\end{enumerate}
+\end{block}
+\begin{block}{Optional}
+\begin{enumerate}
+  \item Increase the GCN depth from 2 to 8 layers. Plot validation accuracy vs depth. Where does oversmoothing kick in?
+  \item Try edge features by manually concatenating $(R, X)$ to each message. Does it help?
+\end{enumerate}
+\end{block}
 \end{frame}
 
+% ============================================================
 \begin{frame}{Exit checklist}
-\TODO{Items: (1) write the message-passing equation, (2) name three GNN variants and their key differences, (3) explain oversmoothing in one sentence, (4) match node/edge/graph-level tasks to power-grid examples.}
+\begin{enumerate}
+  \item \checkitem I can explain in one sentence why an MLP on flattened features misses graph structure.
+  \item \checkitem I can write the general message-passing equation and identify the aggregator and updater.
+  \item \checkitem I can describe how GCN, GraphSAGE, and GAT differ in one sentence each.
+  \item \checkitem I can match the three task levels (node, edge, graph) to power-grid examples.
+  \item \checkitem I can sketch the data flow from node features through 2 GCN layers and a pooling layer to a risk score.
+  \item \checkitem I know what oversmoothing is and why depth $> 4$ is usually a bad idea on small graphs.
+  \item \checkitem I can read the Week 7 phase-aware GNN code without consulting external docs.
+\end{enumerate}
 \end{frame}
 
+% ============================================================
 \begin{frame}{References}
-\TODO{Hamilton's \emph{Graph Representation Learning} book (free online), Kipf \& Welling 2017 (GCN), Hamilton et al. 2017 (GraphSAGE), Veli\v{c}kovi\'c et al. 2018 (GAT), Xu et al. 2019 (Weisfeiler-Lehman bounds).}
+\footnotesize
+\begin{itemize}
+  \item \textbf{Hamilton,} \emph{Graph Representation Learning} (free book, 2020). \url{https://www.cs.mcgill.ca/~wlh/grl_book/}. Chapters 1--5 cover everything in this lecture.
+  \item \textbf{Kipf \& Welling, 2017.} \emph{Semi-Supervised Classification with Graph Convolutional Networks}, ICLR. The GCN paper.
+  \item \textbf{Hamilton, Ying, Leskovec, 2017.} \emph{Inductive Representation Learning on Large Graphs}, NeurIPS. GraphSAGE.
+  \item \textbf{Veli\v{c}kovi\'c et al., 2018.} \emph{Graph Attention Networks}, ICLR. GAT.
+  \item \textbf{Xu et al., 2019.} \emph{How Powerful Are Graph Neural Networks?}, ICLR. WL bounds and GIN.
+  \item \textbf{PyTorch Geometric documentation:} \url{https://pytorch-geometric.readthedocs.io/}.
+  \item \textbf{Donon et al., 2020.} \emph{Graph Neural Solver for Power Systems}, IJCNN. Power-grid GNN application.
+\end{itemize}
 \end{frame}
 
 \end{document}

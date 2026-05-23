@@ -337,8 +337,8 @@ Always inspect \code{net.converged}, then sanity-check voltages and loadings bef
 \node[bus, right=of b1] (b2) {2};
 \node[bus, right=of b2] (b3) {3};
 \node[dev, above=0.6cm of b1, fill=blue!10] {Slack\\$|V|=1.00$, $\theta=0$};
-\node[dev, below=0.6cm of b2, fill=red!10] {Load\\$P=1.5, Q=0.6$};
-\node[dev, below=0.6cm of b3, fill=red!10] {Load\\$P=1.0, Q=0.4$};
+\node[dev, below=0.6cm of b2, fill=red!10] {Load\\$P=0.45, Q=0.18$};
+\node[dev, below=0.6cm of b3, fill=red!10] {Load\\$P=0.30, Q=0.12$};
 \draw[thick] (b1) -- node[above]{$z_{12}=0.02+j0.06$} (b2);
 \draw[thick] (b2) -- node[above]{$z_{23}=0.03+j0.08$} (b3);
 \draw[thick] (b1) -- ++(0,0.55);
@@ -383,8 +383,8 @@ Each off-diagonal entry is $-y_{ij}$; each diagonal sums the admittances of bran
   \item \textbf{Repeat} steps 2--5 until $\| F \|_\infty < 10^{-8}$.
 \end{enumerate}
 \vspace{0.5em}
-\begin{block}{Numerical result (typical)}
-$|V_2| \approx 0.965, \theta_2 \approx -3.0^\circ, |V_3| \approx 0.948, \theta_3 \approx -4.5^\circ$. Converges in 3 iterations.
+\begin{block}{Numerical result (converged)}
+$|V_2| \approx 0.964, \theta_2 \approx -2.3^\circ, |V_3| \approx 0.944, \theta_3 \approx -3.6^\circ$. Converges in 3 iterations. You can reproduce this with \code{pp.runpp(net)} on a 100 MVA, 20 kV system.
 \end{block}
 \end{frame}
 
