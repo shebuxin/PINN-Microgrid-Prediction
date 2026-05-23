@@ -1,0 +1,138 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+
+\usetheme{Madrid}
+\usecolortheme{seahorse}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+
+\usepackage{amsmath,amssymb,booktabs,array}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\definecolor{darkblue}{RGB}{0,65,120}
+\hypersetup{colorlinks=true,linkcolor=darkblue,urlcolor=darkblue}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\TODO}[1]{\textcolor{red}{\textbf{TODO:}} \emph{#1}}
+
+\title[L07: PINN]{L07 -- Physics-informed Neural Networks (PINN)}
+\subtitle{Foundations Lecture Series}
+\author{Course Instructor}
+\institute{Microgrid 3-phase Security AI Project}
+\date{Foundations Lecture 7}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+  \begin{center}
+    \small Keywords: physics-informed loss, soft constraints, limit-aware learning, Raissi 2019
+  \end{center}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Lecture roadmap}
+\begin{enumerate}
+  \item The PINN idea -- physics as a soft constraint
+  \item Loss design: data + physics
+  \item Strict vs soft constraints
+  \item Limit-aware learning -- the project's flavor
+  \item When PINNs help and when they don't
+  \item Connection to the project's Week 6 PI-MLP
+\end{enumerate}
+\vspace{0.6em}
+\begin{block}{Prerequisite}
+L05 (MLPs, loss design, PyTorch). Helpful: L01--L04 for the physics being constrained.
+\end{block}
+\end{frame}
+
+% ============================================================
+\section*{1. The PINN idea}
+
+\begin{frame}{Where PINNs come from}
+\TODO{Briefly trace the lineage from prior physics-based ML to Raissi-Perdikaris-Karniadakis 2019. State the central idea: encode the known PDE/ODE/algebraic constraint into the loss function so the model is penalized for violating physics, not just for fitting data poorly.}
+\end{frame}
+
+\begin{frame}{Why bother with physics in the loss}
+\TODO{Three reasons: (1) extrapolation beyond the training distribution, (2) data efficiency, (3) interpretability. Concrete example from microgrid security: a model that respects voltage limits ``for free'' is more trustworthy than one that learns them from data alone.}
+\end{frame}
+
+% ============================================================
+\section*{2. Loss design}
+
+\begin{frame}{Data loss + physics loss}
+\TODO{Write $\mathcal{L} = \mathcal{L}_{\text{data}} + \lambda \mathcal{L}_{\text{phys}}$. Explain that $\mathcal{L}_{\text{phys}}$ is typically the squared residual of a physical equation evaluated at the model's prediction. Discuss the role and sensitivity of $\lambda$.}
+\end{frame}
+
+\begin{frame}{Multi-task framing}
+\TODO{Many PINNs in power systems are really multi-task: classification + regression + ranking + limit penalty. Show the project's Week 6 PI-MLP composite loss as a concrete example.}
+\end{frame}
+
+\begin{frame}{Choosing physics terms}
+\TODO{Concrete physics terms relevant to this project: voltage limit penalty, current limit penalty, VUF penalty, power-balance residual, sequence-component consistency. Note that not all of these are strict PINN-style PDE residuals -- some are just engineering limits.}
+\end{frame}
+
+% ============================================================
+\section*{3. Strict vs soft constraints}
+
+\begin{frame}{Soft constraints (the usual PINN)}
+\TODO{Add a penalty to the loss. Model can still violate the constraint; the penalty just makes that costly. Easy to implement, gradient-friendly. The default approach.}
+\end{frame}
+
+\begin{frame}{Strict constraints (projection / hard layer)}
+\TODO{Project the output onto the feasible set, or build a network architecture that cannot violate the constraint by construction. Harder to design, often necessary for safety-critical applications.}
+\end{frame}
+
+\begin{frame}{Which one for screening?}
+\TODO{For pre-screening (the project's framing), soft constraints are usually fine -- we still re-run the simulator on flagged contingencies. For deployment without simulator backup, you would want hard constraints or conformal prediction.}
+\end{frame}
+
+% ============================================================
+\section*{4. Limit-aware learning}
+
+\begin{frame}{The project's flavor of physics-informed}
+\TODO{The project does \emph{not} encode the full AC power-flow residual into the loss. It uses ``limit-aware'' soft penalties: voltage limits, current limits, VUF threshold. This is a pragmatic subset of full PINN. Be honest with students about this.}
+\end{frame}
+
+\begin{frame}{Severity regression as physics-informed}
+\TODO{Predicting not just label (safe / unsafe) but also severity is a form of physics-informed multi-task learning. The severity head learns continuous physical quantities, which can stabilize the classification head.}
+\end{frame}
+
+\begin{frame}{Ranking loss as physics-informed}
+\TODO{The project also adds a pairwise ranking loss: for top-k screening, the order of risk scores matters more than absolute probabilities. Frame this as another physics-aware multi-task component.}
+\end{frame}
+
+% ============================================================
+\section*{5. When PINNs help (and don't)}
+
+\begin{frame}{When PINNs help}
+\TODO{Sparse data, known physics, extrapolation, safety-critical applications. Mention published cases from fluid mechanics, biomechanics, and power systems.}
+\end{frame}
+
+\begin{frame}{When PINNs do not help (or hurt)}
+\TODO{Lots of data + well-tuned baseline. Wrong physics (e.g., a constraint that conflicts with the actual data-generating process). Overweighted penalty term. Poor optimization landscape from competing loss terms.}
+\end{frame}
+
+% ============================================================
+\section*{6. Connection to the project}
+
+\begin{frame}{What you will see in Week 6}
+\TODO{Show the high-level PI-MLP loss decomposition: BCE + severity MSE + component-margin + consistency + ranking. Promise to walk through each term. Forward-reference the ablation table from the paper.}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Homework}
+\TODO{Suggest: take the MLP from L05 (e.g., trained on a small N-1 dataset), add a voltage-limit penalty term, retune $\lambda$, and report whether recall and precision improve. Plot loss components over training.}
+\end{frame}
+
+\begin{frame}{Exit checklist}
+\TODO{Items: (1) write the generic PINN loss form, (2) distinguish soft and strict constraints, (3) list the 5 physics terms used in the project, (4) name one scenario where PINNs help and one where they don't.}
+\end{frame}
+
+\begin{frame}{References}
+\TODO{Raissi, Perdikaris, Karniadakis 2019 (\emph{JCP}); Karniadakis et al. 2021 \emph{Nature Reviews Physics} survey; Krishnapriyan et al. 2021 (\emph{NeurIPS}, on PINN failure modes); Recent power-system PINN surveys (Misyris et al., Stiasny et al.).}
+\end{frame}
+
+\end{document}

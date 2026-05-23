@@ -1,0 +1,134 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+
+\usetheme{Madrid}
+\usecolortheme{seahorse}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+
+\usepackage{amsmath,amssymb,booktabs,array}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\definecolor{darkblue}{RGB}{0,65,120}
+\hypersetup{colorlinks=true,linkcolor=darkblue,urlcolor=darkblue}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\TODO}[1]{\textcolor{red}{\textbf{TODO:}} \emph{#1}}
+
+\title[L06: GNN]{L06 -- Graph Neural Networks (GNN)}
+\subtitle{Foundations Lecture Series}
+\author{Course Instructor}
+\institute{Microgrid 3-phase Security AI Project}
+\date{Foundations Lecture 6}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+  \begin{center}
+    \small Keywords: message passing, GCN, GraphSAGE, GAT, node/edge/graph-level tasks
+  \end{center}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Lecture roadmap}
+\begin{enumerate}
+  \item Why graphs and why an MLP is not enough
+  \item Message passing: the core idea
+  \item Major variants: GCN, GraphSAGE, GAT
+  \item Tasks: node-level, edge-level, graph-level
+  \item Known limitations
+  \item Power-grid application preview
+\end{enumerate}
+\vspace{0.6em}
+\begin{block}{Prerequisite}
+L05 (MLPs and PyTorch). Helpful: basic graph theory (nodes, edges, adjacency matrix).
+\end{block}
+\end{frame}
+
+% ============================================================
+\section*{1. Why graphs}
+
+\begin{frame}{Examples of graph-structured data}
+\TODO{Bullet list: molecules, citation networks, social graphs, transportation networks, \emph{power grids}. Visual of a power grid as a graph with buses=nodes, lines=edges.}
+\end{frame}
+
+\begin{frame}{Why an MLP on flattened features is not enough}
+\TODO{Show how flattening a graph into a fixed-size feature vector loses topology. An MLP cannot leverage the fact that bus 3 is two hops from bus 1. Set up the need for message passing.}
+\end{frame}
+
+% ============================================================
+\section*{2. Message passing}
+
+\begin{frame}{The core idea in three steps}
+\TODO{(1) Each node has a hidden state. (2) Each node receives messages from its neighbours. (3) Each node updates its state by aggregating messages and combining with its own. Repeat for L layers. Diagram: 2-hop neighborhood.}
+\end{frame}
+
+\begin{frame}{The general message-passing equation}
+\TODO{Write $h_v^{(l+1)} = \text{UPDATE}(h_v^{(l)}, \text{AGG}(\{h_u^{(l)} : u \in \mathcal{N}(v)\}))$. Explain each piece. Note that different choices of AGG and UPDATE give different GNN variants.}
+\end{frame}
+
+% ============================================================
+\section*{3. Variants}
+
+\begin{frame}{GCN (Kipf \& Welling, 2017)}
+\TODO{Write the GCN equation: $H^{(l+1)} = \sigma(\tilde{D}^{-1/2} \tilde{A} \tilde{D}^{-1/2} H^{(l)} W^{(l)})$. Symmetric normalization. Note: simple, effective baseline. PyTorch Geometric implementation is one line.}
+\end{frame}
+
+\begin{frame}{GraphSAGE (Hamilton et al., 2017)}
+\TODO{Mean / max / LSTM aggregator. Inductive (handles unseen nodes), unlike vanilla GCN which is transductive. Practical choice when test graphs differ from train.}
+\end{frame}
+
+\begin{frame}{GAT (Veli\v{c}kovi\'c et al., 2018)}
+\TODO{Attention-weighted message passing. Each neighbour gets a learned attention coefficient $\alpha_{ij}$. Worth the extra parameters when some neighbours matter much more than others. Multi-head attention typically.}
+\end{frame}
+
+% ============================================================
+\section*{4. Tasks}
+
+\begin{frame}{Node-level, edge-level, graph-level outputs}
+\TODO{Three task families with one example each. For our project, we mostly want \emph{graph-level} risk scores: ``does this microgrid state + contingency lead to a violation?''. Note that pooling (mean/sum/max) collapses node embeddings to a single graph vector.}
+\end{frame}
+
+\begin{frame}{The project's GNN}
+\TODO{Forward-reference: Week 7 builds a phase-aware GNN with bus nodes, line edges, contingency masks, and graph-level readout. Honest note: on 77 samples it does not beat a flat MLP. We will discuss why.}
+\end{frame}
+
+% ============================================================
+\section*{5. Limitations}
+
+\begin{frame}{Oversmoothing}
+\TODO{After many layers, all node embeddings converge to the same vector. Limits effective depth to 2--4 layers. Mitigations: residual connections, GraphSAGE max-pool, recent ``deep GNN'' research.}
+\end{frame}
+
+\begin{frame}{Expressivity bounds}
+\TODO{Brief note on the Weisfeiler-Lehman test and what GNNs can/cannot distinguish. Show two non-isomorphic graphs that a standard GNN cannot tell apart. Caveat: not load-bearing for our application, but good to know.}
+\end{frame}
+
+\begin{frame}{Small-data behavior}
+\TODO{GNNs typically need more data than MLPs to show their value, because the message-passing weights are shared across graphs. On 77 samples, MLPs often win. Connect to the project's honest negative result.}
+\end{frame}
+
+% ============================================================
+\section*{6. Power-grid application preview}
+
+\begin{frame}{What a power-grid GNN looks like}
+\TODO{Walk through: nodes = buses, edges = lines/transformers, node features = per-phase load/PV/voltage, edge features = R/X/rating, global features = scenario metadata, output = graph-level risk score. This is the Week 7 architecture.}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Homework}
+\TODO{Suggest: implement a 2-layer GCN on Cora citation network with PyTorch Geometric, achieve $>$80\% test accuracy. Then visualize node embeddings with t-SNE before and after training.}
+\end{frame}
+
+\begin{frame}{Exit checklist}
+\TODO{Items: (1) write the message-passing equation, (2) name three GNN variants and their key differences, (3) explain oversmoothing in one sentence, (4) match node/edge/graph-level tasks to power-grid examples.}
+\end{frame}
+
+\begin{frame}{References}
+\TODO{Hamilton's \emph{Graph Representation Learning} book (free online), Kipf \& Welling 2017 (GCN), Hamilton et al. 2017 (GraphSAGE), Veli\v{c}kovi\'c et al. 2018 (GAT), Xu et al. 2019 (Weisfeiler-Lehman bounds).}
+\end{frame}
+
+\end{document}

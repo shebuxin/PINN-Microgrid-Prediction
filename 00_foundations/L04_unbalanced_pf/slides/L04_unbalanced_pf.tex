@@ -1,0 +1,131 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+
+\usetheme{Madrid}
+\usecolortheme{seahorse}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+
+\usepackage{amsmath,amssymb,booktabs,array}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\definecolor{darkblue}{RGB}{0,65,120}
+\hypersetup{colorlinks=true,linkcolor=darkblue,urlcolor=darkblue}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\TODO}[1]{\textcolor{red}{\textbf{TODO:}} \emph{#1}}
+
+\title[L04: Unbalanced PF]{L04 -- Unbalanced (Three-phase) Power Flow}
+\subtitle{Foundations Lecture Series}
+\author{Course Instructor}
+\institute{Microgrid 3-phase Security AI Project}
+\date{Foundations Lecture 4}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+  \begin{center}
+    \small Keywords: symmetrical components, sequence networks, VUF, \code{runpp\_3ph}
+  \end{center}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Lecture roadmap}
+\begin{enumerate}
+  \item Sources of unbalance in real networks
+  \item Symmetrical components: positive, negative, zero
+  \item Sequence networks and the Fortescue transformation
+  \item Three-phase power-flow formulation
+  \item Voltage Unbalance Factor (VUF)
+  \item \code{pp.runpp\_3ph} in practice
+  \item Why microgrid security analysis needs this lecture
+\end{enumerate}
+\vspace{0.6em}
+\begin{block}{Prerequisite}
+L01 (PF basics), L03 (balanced assumption). L02 helpful for distribution context.
+\end{block}
+\end{frame}
+
+% ============================================================
+\section*{1. Sources of unbalance}
+
+\begin{frame}{Where does unbalance come from?}
+\TODO{Bulleted list with visual examples: single-phase loads, single-phase rooftop PV, EV chargers on one phase, asymmetric line geometry, untransposed lines, single-phase laterals on LV feeders.}
+\end{frame}
+
+\begin{frame}{What unbalance does to operations}
+\TODO{Per-phase undervoltage even when average voltage looks fine. Per-phase overload even when balanced loading is below 100\%. Neutral currents. Increased losses. Motor heating. Connect to the project's violation definitions.}
+\end{frame}
+
+% ============================================================
+\section*{2. Symmetrical components}
+
+\begin{frame}{The Fortescue transformation}
+\TODO{Decompose any three-phase phasor set into positive-, negative-, and zero-sequence components. Define $a = e^{j2\pi/3}$ and the transformation matrix $A$. Inverse transformation. Visual: three rotating phasor sets.}
+\end{frame}
+
+\begin{frame}{Sequence networks}
+\TODO{Show how the three-phase network decouples into three independent sequence networks under linear, symmetric conditions. Mention that grounding configuration affects the zero-sequence network specifically.}
+\end{frame}
+
+% ============================================================
+\section*{3. Three-phase PF formulation}
+
+\begin{frame}{Phase-domain vs sequence-domain formulations}
+\TODO{Explain that you can either solve three coupled phase equations directly or three independent sequence equations after transformation. pandapower's \code{runpp\_3ph} uses sequence frame: positive via NR, negative and zero via current injection.}
+\end{frame}
+
+\begin{frame}{Asymmetric loads and sources}
+\TODO{Walk through how a single-phase load is modeled in pandapower with \code{create\_asymmetric\_load}, including the choice of phase A/B/C. Mirror discussion for \code{create\_asymmetric\_sgen}. Note the wye/delta connection options.}
+\end{frame}
+
+% ============================================================
+\section*{4. Voltage Unbalance Factor}
+
+\begin{frame}{Defining VUF}
+\TODO{The IEEE/IEC definition: VUF = $|V_{\text{neg}}| / |V_{\text{pos}}|$. A simpler engineering proxy: max phase voltage deviation divided by average. State the typical regulatory limit ($\sim 2\%$).}
+\end{frame}
+
+\begin{frame}{VUF as a violation in our project}
+\TODO{Forward-reference: VUF is one of the five violation types in the project's labeling (L01 of weekly material). Even when no phase is under/over voltage individually, VUF can exceed 2\% and that itself is a violation.}
+\end{frame}
+
+% ============================================================
+\section*{5. \code{runpp\_3ph} in practice}
+
+\begin{frame}{Minimal three-phase example}
+\TODO{Code: build a 3-bus unbalanced toy system in pandapower, add asymmetric loads on different phases, call \code{pp.runpp\_3ph(net)}, show \code{res\_bus\_3ph} and \code{res\_line\_3ph} columns. Compare to balanced \code{runpp} on the same system.}
+\end{frame}
+
+\begin{frame}{Reading per-phase results}
+\TODO{Walk through key columns: \code{vm\_a\_pu}, \code{vm\_b\_pu}, \code{vm\_c\_pu}, \code{unbalance\_percent}, per-phase loadings, neutral current.}
+\end{frame}
+
+\begin{frame}{What pandapower 3.x does (and does not) support}
+\TODO{Quick note: \code{runpp\_3ph} solves the sequence-frame PF for grid-connected radial / weakly-meshed networks. It does \emph{not} model islanded grid-forming inverters or droop control. State as a known limitation that the project also inherits.}
+\end{frame}
+
+% ============================================================
+\section*{6. Why microgrids need this lecture}
+
+\begin{frame}{Connecting to the project}
+\TODO{Recap: a microgrid is LV + single-phase loads + single-phase DER + possibly islanded + needs N-1 security analysis. Every reason listed in slide 1 of L04 is present. Hence the entire project is built on \code{runpp\_3ph}.}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Homework}
+\TODO{Suggest: take a balanced 5-bus feeder, add a single-phase 2 kW load on phase A only, run both \code{runpp} and \code{runpp\_3ph}, compare per-phase voltages. Compute VUF by hand from $V_{\text{pos}}, V_{\text{neg}}$.}
+\end{frame}
+
+\begin{frame}{Exit checklist}
+\TODO{Items: (1) state Fortescue, (2) recognize when a problem needs \code{runpp\_3ph}, (3) compute VUF, (4) read \code{res\_bus\_3ph}, (5) explain the five violation types in the project's labeling.}
+\end{frame}
+
+\begin{frame}{References}
+\TODO{Fortescue 1918, Grainger \& Stevenson on symmetrical components, Kersting on three-phase distribution, pandapower ``Asymmetric / Three-phase Power Flow'' docs, IEEE Std 1159 on power quality.}
+\end{frame}
+
+\end{document}

@@ -1,0 +1,111 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+
+\usetheme{Madrid}
+\usecolortheme{seahorse}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+
+\usepackage{amsmath,amssymb,booktabs,array}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\definecolor{darkblue}{RGB}{0,65,120}
+\hypersetup{colorlinks=true,linkcolor=darkblue,urlcolor=darkblue}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\TODO}[1]{\textcolor{red}{\textbf{TODO:}} \emph{#1}}
+
+\title[L02: Distribution PF]{L02 -- Distribution Network Power Flow}
+\subtitle{Foundations Lecture Series}
+\author{Course Instructor}
+\institute{Microgrid 3-phase Security AI Project}
+\date{Foundations Lecture 2}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+  \begin{center}
+    \small Keywords: radial topology, R/X ratio, backward/forward sweep, DER, voltage rise
+  \end{center}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Lecture roadmap}
+\begin{enumerate}
+  \item Why distribution differs from transmission
+  \item Radial topology and the R/X problem
+  \item Backward/Forward Sweep (BFS) algorithm
+  \item DistFlow and linear voltage-drop approximations
+  \item DER impact: reverse flow, voltage rise, hosting capacity
+  \item Toward unbalanced analysis (preview of L04)
+\end{enumerate}
+\vspace{0.6em}
+\begin{block}{Prerequisite}
+L01 -- you should be comfortable with $Y_{\text{bus}}$, NR, and \code{pp.runpp}.
+\end{block}
+\end{frame}
+
+% ============================================================
+\section*{1. Why distribution differs}
+
+\begin{frame}{Transmission vs distribution: a side-by-side}
+\TODO{Build a comparison table covering: voltage level, topology (meshed vs radial), R/X ratio, load composition, three-phase symmetry, DER penetration. Highlight that distribution breaks several assumptions L01 relied on.}
+\end{frame}
+
+\begin{frame}{The R/X problem in one slide}
+\TODO{Explain that high R/X ratio (typical for LV/MV feeders) makes the standard decoupled approximation invalid. Show the simplified voltage-drop formula and note that the P-term cannot be ignored. Set up motivation for BFS.}
+\end{frame}
+
+% ============================================================
+\section*{2. Backward/Forward Sweep}
+
+\begin{frame}{Backward/Forward Sweep at a glance}
+\TODO{Algorithm sketch: traverse radial tree from leaves to root summing currents, then from root back to leaves updating voltages. Emphasize that it exploits the radial structure and avoids the Jacobian altogether.}
+\end{frame}
+
+\begin{frame}{When BFS beats Newton-Raphson}
+\TODO{Convergence comparison on radial vs lightly-meshed networks. Note that BFS is sometimes the only solver that converges on very long LV feeders. pandapower exposes BFSW via \code{algorithm="bfsw"}.}
+\end{frame}
+
+% ============================================================
+\section*{3. Linear approximations}
+
+\begin{frame}{LinDistFlow and friends}
+\TODO{Introduce the linearized voltage-drop formula and the DistFlow / LinDistFlow framework. Explain when the linearization is accurate and when it lies (high P injection, high R/X).}
+\end{frame}
+
+% ============================================================
+\section*{4. DER on distribution feeders}
+
+\begin{frame}{Reverse power flow and voltage rise}
+\TODO{Show how a high-PV bus can have $V > 1.05$ pu (voltage rise) and how PV at the end of a feeder can cause reverse flow into the substation. Explain hosting capacity in one sentence.}
+\end{frame}
+
+\begin{frame}{The microgrid extension}
+\TODO{Highlight grid-connected vs islanded modes, PCC role, DER + BESS as controllable resources. Forward-reference Week 1 kickoff material.}
+\end{frame}
+
+% ============================================================
+\section*{5. Toward unbalanced analysis}
+
+\begin{frame}{Why distribution is rarely balanced in practice}
+\TODO{List sources of asymmetry: single-phase loads, single-phase rooftop PV, EV chargers, asymmetric line geometry. Conclude that L03's balanced assumption is convenient but not realistic for LV microgrids. Bridge to L04.}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Homework}
+\TODO{Suggest: implement BFSW by hand on a 5-bus radial feeder; vary R/X ratio and compare to NR; analyze a feeder with one high-PV bus and observe voltage rise.}
+\end{frame}
+
+\begin{frame}{Exit checklist}
+\TODO{Fill once content frames are finalized.}
+\end{frame}
+
+\begin{frame}{References}
+\TODO{Baran \& Wu (DistFlow), Cespedes (1990 BFS paper), Kersting textbook for distribution analysis, pandapower BFSW documentation.}
+\end{frame}
+
+\end{document}

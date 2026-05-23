@@ -1,0 +1,138 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+
+\usetheme{Madrid}
+\usecolortheme{seahorse}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+
+\usepackage{amsmath,amssymb,booktabs,array}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\definecolor{darkblue}{RGB}{0,65,120}
+\hypersetup{colorlinks=true,linkcolor=darkblue,urlcolor=darkblue}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\TODO}[1]{\textcolor{red}{\textbf{TODO:}} \emph{#1}}
+
+\title[L05: MLP]{L05 -- Multilayer Perceptron (MLP)}
+\subtitle{Foundations Lecture Series}
+\author{Course Instructor}
+\institute{Microgrid 3-phase Security AI Project}
+\date{Foundations Lecture 5}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+  \begin{center}
+    \small Keywords: layers, activations, backprop, loss, train/val/test, PyTorch
+  \end{center}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Lecture roadmap}
+\begin{enumerate}
+  \item From linear models to MLPs
+  \item Architecture: layers, activations, output heads
+  \item Training: loss, backprop, gradient descent
+  \item The discipline: train/val/test, regularization, class imbalance
+  \item PyTorch minimal example
+  \item Common pitfalls
+\end{enumerate}
+\vspace{0.6em}
+\begin{block}{Prerequisite}
+Basic linear algebra (matrix-vector products, dot products) and basic calculus (partial derivatives, chain rule). Python familiarity.
+\end{block}
+\end{frame}
+
+% ============================================================
+\section*{1. From linear models to MLPs}
+
+\begin{frame}{Why linear is not enough}
+\TODO{Show a simple example where linear classification fails (XOR or moons). State that an MLP is just a sequence of linear maps composed with nonlinearities. Visualize how stacking transforms separates the data.}
+\end{frame}
+
+\begin{frame}{The MLP equation}
+\TODO{Write the standard form: $h_{l+1} = \sigma(W_l h_l + b_l)$. Define each symbol. Show the data shape flow from input through hidden to output. Note the connection to logistic regression as the 0-hidden-layer case.}
+\end{frame}
+
+% ============================================================
+\section*{2. Architecture}
+
+\begin{frame}{Activation functions}
+\TODO{Plot and explain: sigmoid, tanh, ReLU, LeakyReLU, GELU. State practical defaults: ReLU for hidden, sigmoid/softmax for output. Note vanishing gradient problem of sigmoid in deep nets.}
+\end{frame}
+
+\begin{frame}{Output heads for different tasks}
+\TODO{Binary classification: sigmoid + BCE. Multi-class: softmax + cross-entropy. Regression: linear + MSE. Multi-task: multiple heads. Forward-reference to PI-MLP design in Week 6 of the project.}
+\end{frame}
+
+\begin{frame}{Choosing depth and width}
+\TODO{Rules of thumb: start small (1--2 hidden layers, 32--128 units), increase if underfitting. Connect to bias-variance: too small underfits, too large overfits on small data. Reference the project's 77-sample regime as ``small data''.}
+\end{frame}
+
+% ============================================================
+\section*{3. Training}
+
+\begin{frame}{The training loop in one slide}
+\TODO{Pseudocode: for each epoch, for each batch, (1) forward pass, (2) compute loss, (3) backward pass, (4) update parameters. Note the role of the optimizer.}
+\end{frame}
+
+\begin{frame}{Backpropagation in one slide}
+\TODO{Chain rule applied layer-by-layer to compute $\partial \mathcal{L} / \partial W_l$ efficiently. Note that frameworks like PyTorch compute this automatically via autograd. No need to derive gradients by hand.}
+\end{frame}
+
+\begin{frame}{Optimizers: SGD, momentum, Adam}
+\TODO{Short tour: vanilla SGD, SGD with momentum, Adam. Default for this course: Adam with lr=1e-3. Mention learning-rate schedulers briefly.}
+\end{frame}
+
+% ============================================================
+\section*{4. The discipline}
+
+\begin{frame}{Train / validation / test splits}
+\TODO{Define each, with the rule that test is touched once at the end. Validation is for hyperparameter tuning. Forward-reference: the project uses group CV (by scenario or contingency), not random splits.}
+\end{frame}
+
+\begin{frame}{Regularization: why and how}
+\TODO{L2 weight decay, dropout, early stopping. Connect to overfitting in the project's small-sample regime. Show a generic train/val loss curve with the overfitting inflection point.}
+\end{frame}
+
+\begin{frame}{Class imbalance}
+\TODO{The project's labels are 47 unsafe vs 30 safe. Discuss weighted BCE, oversampling, threshold tuning. Reinforce: in safety screening, the right metric is recall/FNR, not accuracy.}
+\end{frame}
+
+% ============================================================
+\section*{5. PyTorch minimal example}
+
+\begin{frame}{Minimal MLP in PyTorch}
+\TODO{Code block: define a 2-hidden-layer MLP with torch.nn.Sequential, instantiate optimizer (Adam), define loss (BCE), training loop. Aim for $\leq 25$ lines of code total.}
+\end{frame}
+
+\begin{frame}{Inspecting a trained model}
+\TODO{Show how to: get predictions, compute confusion matrix, plot PR curve, compute recall at a chosen threshold. Frame these as the metrics that matter in the project.}
+\end{frame}
+
+% ============================================================
+\section*{6. Common pitfalls}
+
+\begin{frame}{Pitfalls in MLP training}
+\TODO{Enumerate: not normalizing inputs; using the wrong activation on the output head; data leakage between train and test; tuning on the test set; declaring victory based on accuracy when the data is imbalanced; forgetting to seed the RNG.}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Homework}
+\TODO{Suggest: build a 2-hidden-layer MLP on the moons dataset, achieve 95\%+ test accuracy, plot the decision boundary, then re-train with severe class imbalance and explain why the boundary moves.}
+\end{frame}
+
+\begin{frame}{Exit checklist}
+\TODO{Items: write the MLP forward equation, list 3 activation functions and when to use each, explain backprop in 2 sentences, code a training loop in PyTorch, name 3 regularizers.}
+\end{frame}
+
+\begin{frame}{References}
+\TODO{Goodfellow et al. \emph{Deep Learning} chapter 6, Bishop \emph{Pattern Recognition and Machine Learning} chapter 5, PyTorch tutorials (\code{nn.Module} and the 60-min blitz).}
+\end{frame}
+
+\end{document}

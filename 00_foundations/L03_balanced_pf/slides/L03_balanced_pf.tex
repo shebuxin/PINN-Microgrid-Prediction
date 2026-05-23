@@ -1,0 +1,118 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+
+\usetheme{Madrid}
+\usecolortheme{seahorse}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+
+\usepackage{amsmath,amssymb,booktabs,array}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\definecolor{darkblue}{RGB}{0,65,120}
+\hypersetup{colorlinks=true,linkcolor=darkblue,urlcolor=darkblue}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\TODO}[1]{\textcolor{red}{\textbf{TODO:}} \emph{#1}}
+
+\title[L03: Balanced PF]{L03 -- Balanced (Single-phase Equivalent) Power Flow}
+\subtitle{Foundations Lecture Series}
+\author{Course Instructor}
+\institute{Microgrid 3-phase Security AI Project}
+\date{Foundations Lecture 3}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+  \begin{center}
+    \small Keywords: positive sequence, single-line diagram, three-phase symmetry, when balance holds
+  \end{center}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Lecture roadmap}
+\begin{enumerate}
+  \item What ``balanced'' actually means
+  \item The single-phase equivalent: how we collapse three phases into one
+  \item Positive-sequence networks
+  \item When the balanced assumption is appropriate
+  \item When it lies: preview of L04
+\end{enumerate}
+\vspace{0.6em}
+\begin{block}{Prerequisite}
+L01 -- you should be comfortable with $Y_{\text{bus}}$ and the PF equations. L02 helpful but not required.
+\end{block}
+\end{frame}
+
+% ============================================================
+\section*{1. What ``balanced'' means}
+
+\begin{frame}{Definition of balanced operation}
+\TODO{Three-phase voltages and currents equal in magnitude, $120^\circ$ apart, sinusoidal. Source is symmetric, loads are symmetric, line parameters are symmetric. Visual: phasor diagram of a balanced set.}
+\end{frame}
+
+\begin{frame}{Symmetry assumptions in three places}
+\TODO{(i) Source symmetry, (ii) load symmetry, (iii) line geometry symmetry (or transposition). All three usually hold in transmission, often fail in distribution. Bridge: under all three, three coupled equations collapse to one.}
+\end{frame}
+
+% ============================================================
+\section*{2. The single-phase equivalent}
+
+\begin{frame}{Collapsing three phases into one}
+\TODO{Show that under balance, $V_b = a^2 V_a$ and $V_c = a V_a$ with $a = e^{j 2\pi/3}$. Therefore we only need to solve for phase $a$ -- the other phases follow by rotation. This is the ``single-line diagram'' you usually see.}
+\end{frame}
+
+\begin{frame}{Single-line diagrams in practice}
+\TODO{Visual example: a small system shown both as a true three-phase circuit and as its single-line equivalent. Note that one-line diagrams in textbooks and pandapower's \code{runpp} both implicitly use this collapse.}
+\end{frame}
+
+% ============================================================
+\section*{3. Positive-sequence networks}
+
+\begin{frame}{Positive sequence in 30 seconds}
+\TODO{Forward-reference to L04's symmetrical components: positive, negative, zero. Under balance, only positive sequence is non-zero. Negative and zero sequence appear only when balance breaks.}
+\end{frame}
+
+\begin{frame}{The math is L01's math}
+\TODO{Show that the PF equations from L01 \emph{are} the positive-sequence PF equations. \code{pp.runpp} solves them. Nothing new computationally -- only the interpretation changes.}
+\end{frame}
+
+% ============================================================
+\section*{4. When balance is appropriate}
+
+\begin{frame}{When the assumption is fine}
+\TODO{Transmission grids: three-phase loads, transposed lines, large industrial loads. The assumption introduces small ($< 1\%$) errors. List several practical examples where balanced PF is the right tool.}
+\end{frame}
+
+\begin{frame}{Quick-and-dirty hosting analyses}
+\TODO{For distribution-level studies where the question is ``rough voltage profile, rough loading'', balanced PF is sometimes acceptable as a first pass. Note caveats: never claim phase-specific results from a balanced model.}
+\end{frame}
+
+% ============================================================
+\section*{5. When it lies}
+
+\begin{frame}{Where the balanced assumption breaks}
+\TODO{Single-phase loads, single-phase rooftop PV, EV charging, asymmetric line geometry, fault analysis. Show a small example where balanced PF reports ``all good'' but the actual three-phase analysis (L04) shows phase A undervoltage.}
+\end{frame}
+
+\begin{frame}{Diagnostic: when do I need L04?}
+\TODO{A short checklist for students: (1) Are loads single-phase? (2) Is PV single-phase? (3) Are line parameters asymmetric? (4) Is the network LV? If any yes, you need unbalanced PF.}
+\end{frame}
+
+% ============================================================
+\begin{frame}{Homework}
+\TODO{Take the L01 three-bus system, intentionally make one of the loads single-phase, and explain why \code{runpp} silently lies. Run \code{runpp\_3ph} on the same system and report the per-phase voltage spread.}
+\end{frame}
+
+\begin{frame}{Exit checklist}
+\TODO{Items: (1) I can state the three symmetry assumptions, (2) I can draw a one-line from a three-phase, (3) I can decide whether to use \code{runpp} or \code{runpp\_3ph}, (4) I know the connection to symmetrical components is coming in L04.}
+\end{frame}
+
+\begin{frame}{References}
+\TODO{Grainger \& Stevenson chapter on per-phase analysis, IEC/IEEE definitions of balanced operation, pandapower ``AC Power Flow'' page.}
+\end{frame}
+
+\end{document}
