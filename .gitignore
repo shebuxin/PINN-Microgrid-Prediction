@@ -17,3 +17,6 @@
 *.vrb
 *.xdv
 missfont.log
+
+# macOS Finder metadata
+.DS_Store
