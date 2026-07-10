@@ -1,0 +1,57 @@
+{
+  "python.defaultInterpreterPath": "/Users/buxinshe/micromamba/envs/pdpower/bin/python",
+  "latex-workshop.latex.build.enableMagicComments": true,
+  "latex-workshop.latex.recipe.default": "first",
+  "latex-workshop.latex.outDir": "%DIR%",
+  "latex-workshop.latex.auxDir": "%DIR%/build/aux",
+  "latex-workshop.latex.recipes": [
+    {
+      "name": "latexmk-xelatex-clean",
+      "tools": [
+        "latexmk-xelatex-clean"
+      ]
+    },
+    {
+      "name": "latexmk-pdflatex-clean",
+      "tools": [
+        "latexmk-pdflatex-clean"
+      ]
+    }
+  ],
+  "latex-workshop.latex.tools": [
+    {
+      "name": "latexmk-xelatex-clean",
+      "command": "latexmk",
+      "args": [
+        "-cd",
+        "-xelatex",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "-file-line-error",
+        "-synctex=0",
+        "-outdir=%OUTDIR%",
+        "-auxdir=%AUXDIR%",
+        "-emulate-aux-dir",
+        "%DOC%"
+      ],
+      "env": {}
+    },
+    {
+      "name": "latexmk-pdflatex-clean",
+      "command": "latexmk",
+      "args": [
+        "-cd",
+        "-pdf",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "-file-line-error",
+        "-synctex=0",
+        "-outdir=%OUTDIR%",
+        "-auxdir=%AUXDIR%",
+        "-emulate-aux-dir",
+        "%DOC%"
+      ],
+      "env": {}
+    }
+  ]
+}

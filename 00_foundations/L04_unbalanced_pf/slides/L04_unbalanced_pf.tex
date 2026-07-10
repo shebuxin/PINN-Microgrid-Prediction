@@ -308,7 +308,7 @@ Single-phase load $\rightarrow$ \emph{equal} positive, negative, and zero sequen
 \vspace{0.5em}
 \begin{block}{Three things to notice}
 \begin{itemize}
-  \item Same topology in all three networks; only the impedance changes.
+  \item For this line-only example the bus graph is the same in all three networks; transformer vector groups and grounding can change the zero-sequence path.
   \item Only the positive network has a non-zero slack voltage (the generator is balanced).
   \item Loads inject into all three networks if they are unbalanced; into only the positive if balanced.
 \end{itemize}
@@ -318,17 +318,17 @@ Single-phase load $\rightarrow$ \emph{equal} positive, negative, and zero sequen
 % ============================================================
 \begin{frame}{Sequence impedances: where they come from}
 \centering
-\small
-\begin{tabular}{lll}
+\scriptsize
+\begin{tabular}{@{}p{0.24\textwidth}p{0.24\textwidth}p{0.44\textwidth}@{}}
 \toprule
 Element & Typical $Z^{(0)}$ vs $Z^{(1)}$ & Why \\
 \midrule
 Transmission line, transposed & $Z^{(0)} \approx 3\text{--}5 \cdot Z^{(1)}$ & ground/earth return path is high-impedance \\
 LV cable, 4-wire & $Z^{(0)} \approx 2\text{--}4 \cdot Z^{(1)}$ & neutral conductor + ground return \\
 LV cable, 3-wire (no neutral) & $Z^{(0)}$ very large or undefined & no zero-sequence path \\
-Synchronous generator & $Z^{(0)} < Z^{(2)} < Z^{(1)}$ & depends on stator winding geometry \\
-Wye-grounded transformer & $Z^{(0)} \approx Z^{(1)}$ & ground path closes the circuit \\
-Delta or wye-ungrounded trafo & $Z^{(0)} = \infty$ & no zero-sequence path through the trafo \\
+Synchronous generator & machine-specific & neutral grounding and winding data matter \\
+Grounded-wye transformer side & finite if a return path exists & vector group and grounding define the path \\
+Delta winding & blocks zero-sequence line current across that side & zero-sequence current may circulate inside the delta \\
 \bottomrule
 \end{tabular}
 \vspace{0.6em}
@@ -376,8 +376,8 @@ LV microgrid feeders often have a neutral. Single-phase loads cause $I^{(0)} \ne
 
 \begin{frame}{Phase domain vs sequence domain}
 \centering
-\small
-\begin{tabular}{p{0.32\textwidth} p{0.32\textwidth} p{0.32\textwidth}}
+\scriptsize
+\begin{tabular}{@{}p{0.28\textwidth}p{0.30\textwidth}p{0.32\textwidth}@{}}
 \toprule
  & \textbf{Phase-domain PF} & \textbf{Sequence-domain PF} \\
 \midrule
@@ -449,7 +449,7 @@ The load is on phase A only; phases B and C are unloaded. The slack at bus 1 pro
 \end{frame}
 
 % ============================================================
-\begin{frame}{Step 1 -- Phase currents to sequence currents}
+\begin{frame}[shrink=5]{Step 1 -- Phase currents to sequence currents}
 \textbf{Flat-start linear approximation:} assume $V_2 \approx 1$ so that $I_a = (S_a/V_a)^* \approx S_a$. (The constant-power feedback as $V$ drops is left to the iterative solver; we revisit in Step 4.)
 \vspace{0.3em}
 \begin{equation*}
@@ -506,7 +506,7 @@ Positive-sequence voltage at bus 2 is $0.993$ pu -- which would be the answer if
 \end{frame}
 
 % ============================================================
-\begin{frame}{Step 3 -- Sequence voltages to phase voltages (linear estimate)}
+\begin{frame}[shrink=4]{Step 3 -- Sequence voltages to phase voltages (linear estimate)}
 Apply $A$ (inverse Fortescue):
 \begin{align*}
 \mathbf{V}_a &= V^{(0)} + V^{(1)} + V^{(2)} \\
@@ -536,7 +536,7 @@ At this stage hand math says: phase A drops to $0.974$, phase B rises slightly t
 \end{frame}
 
 % ============================================================
-\begin{frame}{Step 4 -- Verify with pandapower (constant-power, iterated)}
+\begin{frame}[shrink=8]{Step 4 -- Verify with pandapower (constant-power, iterated)}
 Running \code{pp.runpp\_3ph} on the same network with the load modeled as constant-power (the default) and iterating to convergence:
 \vspace{0.4em}
 \centering
@@ -552,7 +552,7 @@ $\Delta$ (truth $-$ linear estimate) & $-0.066$ & $+0.020$ & $-0.003$ & $+2.24\%
 \end{tabular}
 \vspace{0.6em}
 \begin{block}{Why the linear estimate under-reports}
-As $|V_a|$ drops, a constant-power load draws \emph{more} current ($I = S/V$). More current produces more voltage drop on $Z^{(0)}$ and $Z^{(1)}$, which feeds back into a larger $V$ drop. The iteration amplifies single-phase unbalance, usually by $2$--$5\times$ on LV feeders with high R/X.
+As $|V_a|$ drops, a constant-power load draws \emph{more} current ($I = (S/V)^*$). More current produces more voltage drop on all excited sequence networks, which feeds back into a larger $V$ drop. In this stressed example, the iterative solution therefore differs materially from the flat-start estimate.
 \end{block}
 \begin{alertblock}{Take-away}
 Linear hand math gives intuition. \textbf{For safety screening, always use the iterative solver.} The project's Week 4 labeling code is exactly this: \code{runpp\_3ph} on every scenario $\times$ contingency.
@@ -562,35 +562,36 @@ Linear hand math gives intuition. \textbf{For safety screening, always use the i
 % ============================================================
 \section*{6. Voltage Unbalance Factor}
 
-\begin{frame}{VUF -- two equivalent definitions}
+\begin{frame}[shrink=3]{VUF and a common magnitude-deviation metric}
 \begin{block}{IEC 61000-4-30 (true VUF)}
 \begin{equation*}
 \text{VUF} \;=\; \frac{|\mathbf{V}^{(2)}|}{|\mathbf{V}^{(1)}|} \times 100\%
 \end{equation*}
 The ratio of negative-sequence to positive-sequence voltage magnitude.
 \end{block}
-\begin{block}{NEMA / engineering proxy}
+\begin{block}{NEMA MG 1 percent voltage unbalance (not the same metric)}
 \begin{equation*}
-\text{VUF}_{\text{NEMA}} \;=\; \frac{\max_\phi |\,V_\phi\!-\!\bar{V}\,|}{\bar{V}} \times 100\%, \quad \bar{V} = \tfrac{1}{3}(|V_a|+|V_b|+|V_c|)
+\%\mathrm{VU}_{\mathrm{NEMA}}
+=100\,\frac{\max\limits_{xy\in\{ab,bc,ca\}}\bigl||V_{xy}|-\bar V_{LL}\bigr|}{\bar V_{LL}},
+\quad \bar V_{LL}=\tfrac{|V_{ab}|+|V_{bc}|+|V_{ca}|}{3}.
 \end{equation*}
-Maximum deviation from the average phase voltage, divided by the average. Easier to compute from measurements.
+It uses line-to-line voltage magnitudes; it is a useful motor-oriented proxy, but it is not algebraically equivalent to sequence VUF.
 \end{block}
 \vspace{0.3em}
 \centering
 \small
 \begin{tabular}{ll}
 \toprule
-Regulatory practice & Typical VUF limit \\
+Reference practice & Metric and teaching reference \\
 \midrule
-IEC 61000-2-2 (utility-side LV) & $\le 2\%$ \\
-ANSI C84.1 (utilization voltage) & $\le 3\%$ \\
-NEMA MG1 (motor derating) & $\le 1\%$ recommended \\
+IEC 61000-2-2 (public LV compatibility) & sequence VUF: $2\%$ \\
+NEMA MG 1 (motor terminals) & percent voltage unbalance: $1\%$ recommended maximum \\
 \bottomrule
 \end{tabular}
 \end{frame}
 
 % ============================================================
-\begin{frame}{VUF on our worked example}
+\begin{frame}[shrink=5]{VUF on our worked example}
 \textbf{From hand math (Step 2):}
 \begin{align*}
 |\mathbf{V}^{(1)}_2| &= |0.9933 - j0.0067| \approx 0.9934 \\
@@ -618,18 +619,20 @@ Even when no individual phase voltage crosses its limit, a high VUF damages thre
 % ============================================================
 \section*{7. Modeling unbalanced systems in pandapower}
 
-\begin{frame}[fragile]{Asymmetric loads and sources}
+\begin{frame}[fragile,shrink=8]{Asymmetric loads and sources}
 \begin{lstlisting}[language=Python]
 import pandapower as pp
 
-net = pp.create_empty_network()
+net = pp.create_empty_network(sn_mva=1.0)
 b1 = pp.create_bus(net, vn_kv=0.4)
 b2 = pp.create_bus(net, vn_kv=0.4)
-pp.create_ext_grid(net, bus=b1, vm_pu=1.0)
+pp.create_ext_grid(net, bus=b1, vm_pu=1.0,
+    s_sc_max_mva=1e6, rx_max=0.1,
+    x0x_max=1.0, r0x0_max=0.1)
 pp.create_line_from_parameters(net, b1, b2, length_km=1,
-    r_ohm_per_km=0.08, x_ohm_per_km=0.08, c_nf_per_km=0.0,
-    r0_ohm_per_km=0.16, x0_ohm_per_km=0.16, c0_nf_per_km=0.0,
-    max_i_ka=0.4)
+    r_ohm_per_km=0.008, x_ohm_per_km=0.008, c_nf_per_km=0.0,
+    r0_ohm_per_km=0.016, x0_ohm_per_km=0.016, c0_nf_per_km=0.0,
+    max_i_ka=10.0)
 
 # Single-phase load: 0.4 pu on phase A, zero on B and C (1 MVA base)
 pp.create_asymmetric_load(net, bus=b2,
@@ -648,7 +651,7 @@ pp.create_asymmetric_load(net, bus=b2,
 \end{frame}
 
 % ============================================================
-\begin{frame}[fragile]{Running and reading the three-phase result}
+\begin{frame}[fragile,shrink=10]{Running and reading the three-phase result}
 \begin{lstlisting}[language=Python]
 pp.runpp_3ph(net)
 
@@ -756,7 +759,7 @@ The AI screens these labels. If the AI model is to be trusted, the labels must b
   \item \checkitem I can sketch the three sequence networks for a given physical system.
   \item \checkitem I can argue why $Z^{(0)} > Z^{(1)}$ in a typical 4-wire feeder.
   \item \checkitem I can take phase currents $\to$ sequence currents $\to$ sequence voltages $\to$ phase voltages, by hand, on a small example.
-  \item \checkitem I can compute both IEC and NEMA VUF and apply the correct limit.
+  \item \checkitem I can distinguish IEC sequence VUF from NEMA percent voltage unbalance.
   \item \checkitem I can call \code{pp.runpp\_3ph} and read \code{res\_bus\_3ph}.
   \item \checkitem I can list the five violation types the project labels.
 \end{enumerate}

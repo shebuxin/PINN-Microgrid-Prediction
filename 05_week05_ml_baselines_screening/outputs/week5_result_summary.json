@@ -5,7 +5,7 @@
   "unsafe_count": 47,
   "selected_model": "GradientBoosting",
   "ranking_model": "GradientBoosting",
-  "selected_threshold": 0.3009188996948373,
+  "selected_threshold": 0.30091889969483726,
   "random_seed": 42,
-  "output_dir": "/mnt/data/week5_outputs_complete"
+  "output_dir": "05_week05_ml_baselines_screening/outputs"
 }

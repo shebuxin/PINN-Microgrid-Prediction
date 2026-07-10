@@ -381,22 +381,23 @@ More parameters, more computation, more risk of overfitting on small graphs. Use
 % ============================================================
 \begin{frame}{Picking a variant: rough guide}
 \centering
-\small
-\begin{tabular}{lcccc}
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\begin{tabular}{@{}p{0.17\textwidth}p{0.17\textwidth}p{0.19\textwidth}p{0.18\textwidth}p{0.19\textwidth}@{}}
 \toprule
  & \textbf{GCN} & \textbf{GraphSAGE} & \textbf{GAT} & \textbf{Plain MLP} \\
 \midrule
 Topology-aware & \checkitem & \checkitem & \checkitem & --- \\
-Inductive (unseen graphs) & no & \checkitem & \checkitem & yes (with fixed input size) \\
+Inductive use on unseen graphs & possible with shared features & designed for it & possible with shared features & only with fixed-size encoding \\
 Edge features used naturally & limited & limited & limited & --- \\
 Parameter count & smallest & small & medium & smallest \\
-Best on small data ($<$ 1k samples) & often & often & rarely & competitive \\
-Best on large data ($>$ 100k) & ok & good & best & limited \\
+Small-data behavior & can overfit & can overfit & highest overfit risk & strong baseline \\
+Scaling behavior & full-batch or sampled & neighbor sampling is native & attention is costlier & ignores explicit topology \\
 \bottomrule
 \end{tabular}
 \vspace{0.7em}
 \begin{block}{For the project}
-Week 7 uses a GCN-style backbone, customised with per-phase bus channels and a contingency mask. Plain MLP is the comparison baseline. We do \emph{not} use GAT -- 77 samples cannot support its parameter count.
+Week 7 uses a GCN-style backbone, customised with per-phase bus channels and a contingency mask. Plain MLP is the comparison baseline. With only 77 samples, architecture ranking is an empirical question rather than a rule inferred from model names.
 \end{block}
 \end{frame}
 
@@ -518,8 +519,8 @@ Node 2's new embedding $h_2^{(1)}$ \emph{depends on its neighbours' features}. A
 % ============================================================
 \begin{frame}{After two layers + pooling, we get a risk score}
 \centering
-\begin{tikzpicture}[node distance=0.5cm and 0.8cm, every node/.style={font=\scriptsize}]
-\tikzset{box/.style={draw, rounded corners, align=center, minimum width=2.6cm, minimum height=0.9cm}}
+\begin{tikzpicture}[node distance=0.35cm, every node/.style={font=\scriptsize}]
+\tikzset{box/.style={draw, rounded corners, align=center, minimum width=2.2cm, minimum height=0.9cm}}
 \tikzset{arr/.style={-{Latex[length=2.5mm]}, thick}}
 \node[box, fill=blue!10] (in) {Node features\\$h_v^{(0)} \in \mathbb{R}^3$};
 \node[box, fill=warnorange!18, right=of in] (g1) {GCN layer 1\\$\to \mathbb{R}^{16}$};
@@ -642,7 +643,7 @@ Limit depth to 2--4 layers for most problems. If you need deeper, use residual c
 \end{tikzpicture}
 \vspace{0.5em}
 \begin{block}{The take-away}
-Standard GNNs (GCN / GraphSAGE / GAT) are as powerful as the 1-WL graph isomorphism test. There exist non-isomorphic graphs they \emph{cannot} distinguish. Advanced architectures (higher-order WL, structural features) push this further. For our project's needs, 1-WL expressivity is enough.
+Message-passing GNNs are upper-bounded by the 1-WL graph isomorphism test, and particular aggregators can be less expressive. There exist non-isomorphic graphs they \emph{cannot} distinguish. Structural features or higher-order architectures can go beyond this limit.
 \end{block}
 \end{frame}
 
@@ -679,7 +680,7 @@ The architecture is right; the dataset is too small. Scale to hundreds of feeder
 % ============================================================
 \section*{7. Project's phase-aware GNN}
 
-\begin{frame}{Week 7's phase-aware GNN at a high level}
+\begin{frame}[shrink=12]{Week 7's phase-aware GNN at a high level}
 \centering
 \begin{tikzpicture}[node distance=0.5cm and 0.7cm, every node/.style={font=\scriptsize}]
 \tikzset{box/.style={draw, rounded corners, align=center, minimum width=2.3cm, minimum height=0.7cm}}

@@ -129,12 +129,12 @@ A linear classifier predicts $\hat{y} = \sigma(w_1 x_1 + w_2 x_2 + b)$ -- the de
 \end{tikzpicture}
 \vspace{0.3em}
 \begin{alertblock}{What's wrong}
-The best linear separator must \emph{trade off}: it can correctly classify the two unsafe clusters but only by also flagging some safe points as unsafe, or vice versa. No single line works for this geometry. Accuracy plateaus around 75\%.
+The best linear separator must \emph{trade off}: it can correctly classify the two unsafe clusters but only by also flagging some safe points as unsafe, or vice versa. No single line perfectly separates this geometry.
 \end{alertblock}
 \end{frame}
 
 % ============================================================
-\begin{frame}{MLP: stack nonlinear layers, get a curved boundary}
+\begin{frame}[shrink=3]{MLP: stack nonlinear layers, get a curved boundary}
 An MLP composes \emph{affine maps} with \emph{nonlinear activations}:
 \begin{equation*}
 \boxed{\;h_{l+1} \;=\; \sigma\!\left( W_l \, h_l + b_l \right), \quad l = 0, 1, \ldots, L-1\;}
@@ -253,14 +253,14 @@ A 2-hidden-layer MLP for our 2D toy problem:
 % ============================================================
 \begin{frame}{Output heads for different tasks}
 \centering
-\small
-\begin{tabular}{lll}
+\scriptsize
+\begin{tabular}{@{}p{0.38\textwidth}p{0.23\textwidth}p{0.31\textwidth}@{}}
 \toprule
 Task & Output activation & Loss \\
 \midrule
 Binary classification (safe vs unsafe) & sigmoid & binary cross-entropy (BCE) \\
-Multi-class classification (5 violation types) & softmax & cross-entropy \\
-Regression (severity score) & identity / linear & mean squared error (MSE) \\
+Multi-label classification (simultaneous violation flags) & one sigmoid per flag & binary cross-entropy per flag \\
+Regression (severity score) & identity / linear & MSE or SmoothL1 \\
 Ranking (top-k risk order) & identity & pairwise hinge / ranking loss \\
 \textbf{Multi-task (project's PI-MLP)} & multiple heads at once & weighted sum of the above \\
 \bottomrule
@@ -360,8 +360,8 @@ You write the forward pass. Calling \code{loss.backward()} fills in \code{param.
 % ============================================================
 \begin{frame}{Optimizers: SGD, momentum, Adam}
 \centering
-\small
-\begin{tabular}{lll}
+\scriptsize
+\begin{tabular}{@{}p{0.16\textwidth}p{0.48\textwidth}p{0.28\textwidth}@{}}
 \toprule
 Optimizer & Update rule (per parameter $\theta$) & When to use \\
 \midrule
@@ -372,7 +372,7 @@ Optimizer & Update rule (per parameter $\theta$) & When to use \\
 \end{tabular}
 \vspace{0.6em}
 \begin{block}{Recommended default for this course}
-\code{torch.optim.Adam(model.parameters(), lr=1e-3)}. Works well on $\sim 90\%$ of small-to-medium problems. For very small datasets like ours, you may need to drop to $\text{lr} = 10^{-4}$ to avoid oscillation.
+\code{torch.optim.Adam(model.parameters(), lr=1e-3)} is a reasonable first baseline. Validate it rather than treating it as universal; for very small datasets, reducing the learning rate to $10^{-4}$ can help if optimization oscillates.
 \end{block}
 \end{frame}
 
@@ -526,7 +526,7 @@ model = nn.Sequential(
 \end{frame}
 
 % ============================================================
-\begin{frame}[fragile]{Step 2: training loop}
+\begin{frame}[fragile,shrink=5]{Step 2: training loop}
 \begin{lstlisting}[language=Python]
 opt   = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
 bce   = nn.BCELoss()

@@ -1,0 +1,2 @@
+selected_model,threshold,manual_tp,manual_fp,manual_tn,manual_fn,recall,fnr,calls_saved_fraction
+GradientBoosting,0.30091889969483726,12,0,8,0,1.0,0.0,0.4

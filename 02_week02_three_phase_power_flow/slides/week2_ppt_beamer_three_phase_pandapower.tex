@@ -76,7 +76,7 @@
 本周先把三相 base-case 潮流算对、验对。Week 4 再把相同检查扩展为 N-1 violation label。
 \end{block}
 \begin{alertblock}{本周核心能力}
-不是“会调用函数”, 而是能证明输出结果与基本物理一致。
+会调用函数, 且能证明输出结果与基本物理一致。
 \end{alertblock}
 \end{columns}
 \end{frame}
@@ -244,11 +244,233 @@ V_c = |V_c|e^{j\theta_c}
 \end{frame}
 
 % ----------------------------------------------------------------------
-\begin{frame}{对称分量: 从 ABC 到 012}
-定义:
+\subsection{不对称建模}
+
+\begin{frame}{先回忆: Balanced Power Flow 在求什么?}
+\begin{columns}[T]
+\column{0.52\textwidth}
+\small
+balanced power flow 把三相系统压缩成一份单相/正序等值网络:
+\begin{align*}
+S_i &= P_i+jQ_i = V_i I_i^*,\\
+I_i &= \sum_j Y_{ij}V_j.
+\end{align*}
+求解得到每个 bus 的一个复电压 $V_i$。如果需要还原三相:
 \[
-a=e^{j2\pi/3}
+V_{i,a}=V_i,\quad V_{i,b}=a^2V_i,\quad V_{i,c}=aV_i,
+\quad a=e^{j120^\circ}.
 \]
+\column{0.42\textwidth}
+\centering
+\begin{tikzpicture}[scale=0.85, every node/.style={font=\scriptsize}]
+\tikzset{bus/.style={draw, circle, fill=blue!8, minimum size=0.55cm}}
+\tikzset{phasor/.style={-{Latex[length=2mm]}, very thick}}
+\node[bus] (b0) at (0,0) {$i$};
+\draw[phasor, darkblue] (b0) -- ++(1.2,0) node[right] {$V_a$};
+\draw[phasor, warnorange] (b0) -- ++(-0.6,-1.04) node[below] {$V_b$};
+\draw[phasor, darkgreen] (b0) -- ++(-0.6,1.04) node[above] {$V_c$};
+\node[align=center] at (0,-1.65) {$|V_a|=|V_b|=|V_c|$\\固定 $120^\circ$ 相差};
+\end{tikzpicture}
+\begin{block}{关键假设}
+三相负荷、线路和电源是对称的; 因此一相的解可以代表三相。
+\end{block}
+\end{columns}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{不对称三相建模: 逐 bus 的 ABC 向量}
+\begin{columns}[T]
+\column{0.50\textwidth}
+\small
+不对称建模不再只求一个 $V_i$, 而是求每个 bus 的三相向量:
+\[
+\mathbf{v}_i^{abc}=
+\begin{bmatrix}V_{i,a}\\V_{i,b}\\V_{i,c}\end{bmatrix},\quad
+\mathbf{s}_i^{abc}=
+\begin{bmatrix}S_{i,a}\\S_{i,b}\\S_{i,c}\end{bmatrix}.
+\]
+逐相功率注入满足:
+\[
+\mathbf{i}_i^{abc}=
+\left(\mathbf{s}_i^{abc}\oslash \mathbf{v}_i^{abc}\right)^*.
+\]
+\[
+I_{i,\phi}=\left(\frac{S_{i,\phi}}{V_{i,\phi}}\right)^*,
+\quad \phi\in\{a,b,c\}
+\]
+\begin{block}{符号说明}
+\small
+$\oslash$ 表示逐相相除; 上标 $*$ 表示复共轭, 来自 $S=VI^*$。
+\end{block}
+\column{0.44\textwidth}
+\centering
+\begin{tikzpicture}[node distance=0.65cm, every node/.style={font=\scriptsize}]
+\tikzset{box/.style={draw, rounded corners, align=center, fill=blue!6, minimum width=2.25cm, minimum height=0.72cm}}
+\tikzset{phase/.style={draw, rounded corners, align=center, fill=orange!12, minimum width=2.25cm, minimum height=0.55cm}}
+\tikzset{arrow/.style={-{Latex[length=2mm]}, thick}}
+\node[box] (bus) {Bus $i$\\三相状态};
+\node[phase, below=of bus] (a) {$S_{i,a}, V_{i,a}$};
+\node[phase, below=of a] (b) {$S_{i,b}, V_{i,b}$};
+\node[phase, below=of b] (c) {$S_{i,c}, V_{i,c}$};
+\draw[arrow] (bus) -- (a);
+\draw[arrow] (a) -- (b);
+\draw[arrow] (b) -- (c);
+\end{tikzpicture}
+\begin{alertblock}{直观理解}
+A/B/C 是三个相关通道, 不是一个平均通道。
+\end{alertblock}
+\end{columns}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{不对称模型和对称模型的核心区别}
+\small
+\begin{tabular}{p{0.24\textwidth}p{0.32\textwidth}p{0.35\textwidth}}
+\toprule
+建模对象 & 对称/平衡模型 & 不对称三相模型 \\
+\midrule
+电压变量 & 每个 bus 一个 $V_i$ & 每个 bus 三个 $V_{i,a/b/c}$ \\
+负荷/DER & 三相平均或总量 & A/B/C 逐相 $P,Q$ \\
+线路模型 & 一套正序阻抗 & 可用完整 $3\times3$ 相域矩阵或序参数模型 \\
+相间关系 & 幅值相等, 相角固定 $120^\circ$ & 幅值和相角都由潮流方程决定 \\
+安全风险 & 平均电压、总 loading & 单相低压、单相过流、VUF \\
+\bottomrule
+\end{tabular}
+\vspace{0.8em}
+\begin{block}{一句话}
+balanced model 问的是“这条 feeder 的平均三相状态安全吗?”; unbalanced model 问的是“A/B/C 每一相是否都安全?”。
+\end{block}
+\begin{alertblock}{pandapower 的边界}
+\code{runpp\_3ph()} 使用正/负/零序参数，不直接接收任意非对称 $3\times3$ 线路矩阵；一般相域模型与本课程使用的序域实现要区分。
+\end{alertblock}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{耦合如何处理: phase-domain line model}
+\begin{columns}[T]
+\column{0.49\textwidth}
+\small
+三相线路不是三条完全独立的单相线。相间电磁耦合写进阻抗矩阵:
+\[
+\Delta\mathbf{v}_{ij}^{abc}
+=
+\mathbf{Z}_{ij}^{abc}\mathbf{i}_{ij}^{abc}
+\]
+\[
+\mathbf{Z}_{ij}^{abc}=
+\begin{bmatrix}
+z_{aa} & z_{ab} & z_{ac}\\
+z_{ba} & z_{bb} & z_{bc}\\
+z_{ca} & z_{cb} & z_{cc}
+\end{bmatrix}.
+\]
+\column{0.45\textwidth}
+\small
+\begin{itemize}
+  \item 对角项 $z_{aa},z_{bb},z_{cc}$: 本相压降;
+  \item 非对角项 $z_{ab},z_{ac},\ldots$: 相间 mutual coupling;
+  \item 某一相负荷变化会通过线路耦合影响其他相电压;
+  \item 接地方式和中性线决定零序通道能否流通。
+\end{itemize}
+\begin{alertblock}{建模后果}
+不能把 A/B/C 三相分别跑三次单相潮流后简单拼起来。
+\end{alertblock}
+\end{columns}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{pandapower 如何处理三相耦合?}
+\centering
+\begin{tikzpicture}[node distance=0.85cm and 0.92cm, every node/.style={font=\scriptsize}]
+\tikzset{box/.style={draw, rounded corners, align=center, minimum width=2.15cm, minimum height=0.75cm, fill=blue!6}}
+\tikzset{seq/.style={draw, rounded corners, align=center, minimum width=1.60cm, minimum height=0.68cm, fill=green!10}}
+\tikzset{arrow/.style={-{Latex[length=2mm]}, thick}}
+\node[box] (abcin) {ABC 输入\\逐相 load/DER\\line zero-seq 参数};
+\node[box, right=of abcin] (trans) {ABC $\leftrightarrow$ 012\\坐标变换};
+\node[seq, right=of trans, yshift=0.8cm] (pos) {正序网络\\NR};
+\node[seq, right=of trans] (neg) {负序网络\\电流注入};
+\node[seq, right=of trans, yshift=-0.8cm] (zero) {零序网络\\电流注入};
+\node[box, right=2.95cm of trans] (abcout) {ABC 输出\\三相结果表};
+\draw[arrow] (abcin) -- (trans);
+\draw[arrow] (trans) -- (pos);
+\draw[arrow] (trans) -- (neg);
+\draw[arrow] (trans) -- (zero);
+\draw[arrow] (pos) -- (abcout);
+\draw[arrow] (neg) -- (abcout);
+\draw[arrow] (zero) -- (abcout);
+\end{tikzpicture}
+\vspace{0.7em}
+\begin{block}{课程层面的理解}
+我们在 notebook 中输入 ABC 逐相设备; \code{runpp\_3ph()} 内部利用序分量网络迭代求解。序网络的导纳矩阵分开，但逐相恒功率注入经 ABC/012 变换在迭代中耦合; 最后返回 ABC 逐相结果。
+\end{block}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\subsection{序分量分解}
+
+\begin{frame}{为什么要做序分量分解?}
+\begin{columns}[T]
+\column{0.56\textwidth}
+\centering
+\begin{tikzpicture}[scale=0.78, every node/.style={font=\scriptsize}]
+\tikzset{phasor/.style={-{Latex[length=2mm]}, very thick}}
+\coordinate (orig) at (3.6,1.38);
+\node at (3.6,2.58) {原始不平衡 ABC};
+\draw[phasor, darkblue] (orig) -- ++(1.10,0.20) node[right] {$V_a$};
+\draw[phasor, warnorange] (orig) -- ++(-0.50,-0.95) node[below left] {$V_b$};
+\draw[phasor, darkgreen] (orig) -- ++(-0.82,0.70) node[left] {$V_c$};
+\node[font=\large] at (3.6,-0.08) {$=$};
+
+\coordinate (pos) at (0.75,-1.55);
+\coordinate (neg) at (3.60,-1.55);
+\coordinate (zero) at (6.45,-1.55);
+\node at (0.75,-0.58) {$V^{(1)}$ 正序};
+\node at (3.60,-0.58) {$V^{(2)}$ 负序};
+\node at (6.45,-0.58) {$V^{(0)}$ 零序};
+
+\draw[phasor, darkblue] (pos) -- ++(0.70,0);
+\draw[phasor, warnorange] (pos) -- ++(-0.35,-0.61);
+\draw[phasor, darkgreen] (pos) -- ++(-0.35,0.61);
+
+\node[font=\large] at (2.15,-1.55) {$+$};
+\draw[phasor, darkblue] (neg) -- ++(0.70,0);
+\draw[phasor, warnorange] (neg) -- ++(-0.35,0.61);
+\draw[phasor, darkgreen] (neg) -- ++(-0.35,-0.61);
+
+\node[font=\large] at (5.00,-1.55) {$+$};
+\draw[phasor, darkblue] (zero) ++(0,0.30) -- ++(0.70,0);
+\draw[phasor, warnorange] (zero) -- ++(0.70,0);
+\draw[phasor, darkgreen] (zero) ++(0,-0.30) -- ++(0.70,0);
+\end{tikzpicture}
+\column{0.38\textwidth}
+\small
+\begin{itemize}
+  \item 任意一组 ABC 相量都可以拆成三组“规则”的相量;
+  \item 正序代表期望的平衡供电;
+  \item 负序和零序代表不平衡/接地相关成分;
+  \item 分解后更容易定义 VUF 和解释设备风险。
+\end{itemize}
+\end{columns}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{ABC 到 012: 分解步骤}
+\begin{columns}[T]
+\column{0.45\textwidth}
+\small
+\begin{enumerate}
+  \item 从潮流结果拿到幅值和相角;
+  \item 形成复相量 $V_a,V_b,V_c$;
+  \item 乘以对称分量矩阵;
+  \item 得到零序、正序、负序电压。
+\end{enumerate}
+\begin{block}{旋转算子}
+\[
+a=e^{j2\pi/3}=1\angle120^\circ,\quad
+1+a+a^2=0.
+\]
+\end{block}
+\column{0.49\textwidth}
 \[
 \begin{bmatrix}
 V^{(0)} \\
@@ -268,15 +490,43 @@ V_b \\
 V_c
 \end{bmatrix}
 \]
-\begin{itemize}
-  \item $V^{(1)}$: 正序, 正常三相供电的主要分量;
-  \item $V^{(2)}$: 负序, 衡量不平衡程度;
-  \item $V^{(0)}$: 零序, 与接地回路和中性线相关。
-\end{itemize}
+\[
+\begin{bmatrix}
+V_a\\V_b\\V_c
+\end{bmatrix}
+=
+\begin{bmatrix}
+1 & 1 & 1\\
+1 & a^2 & a\\
+1 & a & a^2
+\end{bmatrix}
+\begin{bmatrix}
+V^{(0)}\\V^{(1)}\\V^{(2)}
+\end{bmatrix}
+\]
+\end{columns}
 \end{frame}
 
 % ----------------------------------------------------------------------
-\begin{frame}{VUF: Voltage Unbalance Factor}
+\begin{frame}{三种序分量分别表示什么?}
+\small
+\begin{tabular}{p{0.16\textwidth}p{0.26\textwidth}p{0.45\textwidth}}
+\toprule
+序分量 & 相量特征 & 工程含义 \\
+\midrule
+正序 $V^{(1)}$ & A/B/C 幅值相等, 相序 $a\rightarrow b\rightarrow c$ & 正常三相供电的主要分量; balanced PF 基本只保留这一部分 \\
+负序 $V^{(2)}$ & A/B/C 幅值相等, 相序反向 & 来自不平衡负荷或故障; 会引起电机发热、保护误动、converter stress \\
+零序 $V^{(0)}$ & A/B/C 同相位 & 与接地路径、中性线、线路零序参数有关; 在三线制/接地方式中表现不同 \\
+\bottomrule
+\end{tabular}
+\vspace{0.8em}
+\begin{alertblock}{教学重点}
+序分量不是新的物理量测点, 而是把同一组三相电压换一个坐标系来观察。
+\end{alertblock}
+\end{frame}
+
+% ----------------------------------------------------------------------
+\begin{frame}{What is Voltage Unbalance Factor?}
 \[
 \mathrm{VUF}=100\frac{|V^{(2)}|}{|V^{(1)}|}
 \]
@@ -568,9 +818,9 @@ V_{LN,base}=\frac{V_{LL,base}}{\sqrt{3}}
 
 % ----------------------------------------------------------------------
 \begin{frame}{Proof 4: 复核 line loading}
-每相 loading:
+先定义有效电流限值 $I_{\ell,eff}^{max}=I_\ell^{max}\,df_\ell\,n_{\ell,parallel}$。每相 loading:
 \[
-loading_{\ell,\phi}=100\frac{|I_{\ell,\phi}|}{I_\ell^{max}}
+loading_{\ell,\phi}=100\frac{|I_{\ell,\phi}|}{I_{\ell,eff}^{max}}
 \]
 线路总 loading:
 \[

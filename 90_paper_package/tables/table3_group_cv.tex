@@ -1,9 +1,11 @@
-\begin{table}
+\begin{table*}[t]
+\centering
 \caption{Group-based cross-validation for unseen scenarios and contingencies.}
 \label{tab:group_cv}
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{lllrrrrrr}
 \toprule
-stage & model & cv_type & folds & mean_recall & mean_fnr & mean_pf_calls_saved & mean_auprc & missed_violations_sum \\
+stage & model & cv\_type & folds & mean\_recall & mean\_fnr & mean\_pf\_calls\_saved & mean\_auprc & missed\_violations\_sum \\
 \midrule
 Week 5 ML baseline & EngineeringRule & scenario\_group & 3 & 1.000 & 0.000 & 0.323 & 0.912 & 0.000 \\
 Week 5 ML baseline & AllUnsafe & scenario\_group & 3 & 1.000 & 0.000 & 0.000 & 0.596 & 0.000 \\
@@ -19,4 +21,5 @@ Week 7 GNN & PhaseAwareGNN & contingency\_group & 11 & 0.896 & 0.104 & 0.247 & N
 Week 7 GNN & PhaseAwareGNN & scenario\_group & 7 & 0.690 & 0.310 & 0.468 & NaN & 18.000 \\
 \bottomrule
 \end{tabular}
-\end{table}
+}
+\end{table*}

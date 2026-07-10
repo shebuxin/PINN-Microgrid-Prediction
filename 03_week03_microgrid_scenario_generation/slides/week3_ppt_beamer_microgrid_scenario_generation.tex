@@ -14,12 +14,12 @@
 \usepackage{fontspec}
 \usepackage{hyperref}
 
-\setmainfont{DejaVu Sans}
-\setsansfont{DejaVu Sans}
-\setmonofont{DejaVu Sans Mono}
-\setCJKmainfont{Noto Sans CJK SC}
-\setCJKsansfont{Noto Sans CJK SC}
-\setCJKmonofont{Noto Sans CJK SC}
+\setmainfont{texgyreheros-regular.otf}[BoldFont=texgyreheros-bold.otf,ItalicFont=texgyreheros-italic.otf]
+\setsansfont{texgyreheros-regular.otf}[BoldFont=texgyreheros-bold.otf,ItalicFont=texgyreheros-italic.otf]
+\setmonofont{lmmono10-regular.otf}[BoldFont=lmmonolt10-bold.otf]
+\setCJKmainfont{FandolHei-Regular.otf}
+\setCJKsansfont{FandolHei-Regular.otf}
+\setCJKmonofont{FandolFang-Regular.otf}
 
 \definecolor{myblue}{RGB}{36,88,135}
 \definecolor{mygreen}{RGB}{40,120,80}
@@ -28,6 +28,8 @@
 \setbeamercolor{title}{fg=myblue}
 \setbeamercolor{frametitle}{fg=myblue}
 \setbeamercolor{structure}{fg=myblue}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
 
 \lstset{
   basicstyle=\ttfamily\scriptsize,

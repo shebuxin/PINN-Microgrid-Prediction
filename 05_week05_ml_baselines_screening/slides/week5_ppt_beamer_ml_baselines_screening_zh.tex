@@ -7,13 +7,13 @@
 \usepackage{tikz}
 \usetikzlibrary{positioning,arrows.meta,shapes.geometric,calc}
 \usepackage{listings,xcolor,xeCJK,fontspec}
-\graphicspath{{/mnt/data/week5_outputs_complete/}}
-\setmainfont{DejaVu Sans}
-\setsansfont{DejaVu Sans}
-\setmonofont{DejaVu Sans Mono}
-\setCJKmainfont{Noto Sans CJK SC}
-\setCJKsansfont{Noto Sans CJK SC}
-\setCJKmonofont{Noto Sans CJK SC}
+\graphicspath{{../outputs/}}
+\setmainfont{texgyreheros-regular.otf}[BoldFont=texgyreheros-bold.otf,ItalicFont=texgyreheros-italic.otf]
+\setsansfont{texgyreheros-regular.otf}[BoldFont=texgyreheros-bold.otf,ItalicFont=texgyreheros-italic.otf]
+\setmonofont{lmmono10-regular.otf}[BoldFont=lmmonolt10-bold.otf]
+\setCJKmainfont{FandolHei-Regular.otf}
+\setCJKsansfont{FandolHei-Regular.otf}
+\setCJKmonofont{FandolFang-Regular.otf}
 \definecolor{myblue}{RGB}{36,88,135}
 \definecolor{mygreen}{RGB}{40,120,80}
 \definecolor{mygray}{RGB}{90,90,90}
@@ -44,7 +44,7 @@
 \end{enumerate}
 \end{frame}
 
-\begin{frame}{八周项目中的位置}
+\begin{frame}[shrink=2]{八周项目中的位置}
 \centering
 \begin{tikzpicture}[node distance=0.55cm, every node/.style={font=\scriptsize}]
 \tikzstyle{box}=[draw, rounded corners, minimum width=2.1cm, minimum height=0.62cm, align=center]
@@ -193,9 +193,9 @@ MLP & 0.000 & 1.000 & 0.600 & 0.000 & 0.000 & 0 & 0.533 \\
 \vspace{0.2cm}\begin{block}{本次选择}Selected model: \textbf{GradientBoosting}, $\tau=0.301$。\end{block}
 \end{frame}
 
-\begin{frame}{Precision-recall curves}\centering\includegraphics[width=0.82\textwidth]{week5_precision_recall_curves.png}\end{frame}
-\begin{frame}{Recall vs threshold}\centering\includegraphics[width=0.82\textwidth]{week5_recall_threshold_curves.png}\begin{block}{解释}阈值越高，模型越少判为 unsafe，计算量可能下降，但 recall 也可能下降。\end{block}\end{frame}
-\begin{frame}{Saved PF calls vs missed violations}\centering\includegraphics[width=0.82\textwidth]{week5_saved_calls_vs_missed_violations.png}\begin{alertblock}{解释}如果节省计算的代价是漏掉 unsafe contingency，则部署不可接受。\end{alertblock}\end{frame}
+\begin{frame}{Precision-recall curves}\centering\includegraphics[height=0.76\textheight,keepaspectratio]{week5_precision_recall_curves.png}\end{frame}
+\begin{frame}{Recall vs threshold}\centering\includegraphics[height=0.64\textheight,keepaspectratio]{week5_recall_threshold_curves.png}\begin{block}{解释}阈值越高，模型越少判为 unsafe，计算量可能下降，但 recall 也可能下降。\end{block}\end{frame}
+\begin{frame}{Saved PF calls vs missed violations}\centering\includegraphics[height=0.64\textheight,keepaspectratio]{week5_saved_calls_vs_missed_violations.png}\begin{alertblock}{解释}如果节省计算的代价是漏掉 unsafe contingency，则部署不可接受。\end{alertblock}\end{frame}
 
 \begin{frame}{为什么需要 group-based CV}
 \begin{columns}\begin{column}{0.48\textwidth}\textbf{Random split 问题}\begin{itemize}\item 相同 scenario family 可能进测试集。\item 相同 contingency family 可能进测试集。\item 泛化能力可能被高估。\end{itemize}\end{column}\begin{column}{0.48\textwidth}\textbf{Group CV 目标}\begin{itemize}\item scenario-group CV: unseen operating scenarios。\item contingency-group CV: unseen outages。\item 更接近论文泛化评估。\end{itemize}\end{column}\end{columns}
@@ -235,8 +235,8 @@ scenario\_group & RandomForest & 0.899 & 0.101 & 0.475 & 0.990 \\
 \bottomrule\end{tabular}
 \vspace{0.25cm}\begin{block}{解释}Top-k 模式适合先验证最危险的若干 contingencies。\end{block}
 \end{frame}
-\begin{frame}{Top-k violation recall curve}\centering\includegraphics[width=0.82\textwidth]{week5_topk_violation_recall.png}\end{frame}
-\begin{frame}{Random forest feature importance}\centering\includegraphics[width=0.78\textwidth]{week5_feature_importance.png}\begin{block}{提醒}Feature importance 不是因果解释，但能帮助检查模型是否依赖合理 stress indicators。\end{block}\end{frame}
+\begin{frame}{Top-k violation recall curve}\centering\includegraphics[height=0.76\textheight,keepaspectratio]{week5_topk_violation_recall.png}\end{frame}
+\begin{frame}{Random forest feature importance}\centering\includegraphics[height=0.62\textheight,keepaspectratio]{week5_feature_importance.png}\begin{block}{提醒}Feature importance 不是因果解释，但能帮助检查模型是否依赖合理 stress indicators。\end{block}\end{frame}
 
 \begin{frame}{Manual metric proof}
 \[TP=\sum_i \ind\{y_i=1,\hat y_i=1\},\quad FP=\sum_i \ind\{y_i=0,\hat y_i=1\}\]

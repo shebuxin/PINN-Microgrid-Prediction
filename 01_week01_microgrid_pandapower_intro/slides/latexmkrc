@@ -1,0 +1,4 @@
+$pdf_mode = 5;          # Use XeLaTeX for ctexbeamer Chinese slides.
+$out_dir = '.';
+$aux_dir = 'build/aux';
+$emulate_aux = 1;       # Keep TeX Live auxiliary files out of this folder.

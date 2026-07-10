@@ -213,7 +213,7 @@ $Y_{aa}=Y_{bb}=Y_{cc}$ (self) and $Y_{ab}=Y_{bc}=Y_{ca}$ (mutual). Combined with
 \begin{equation*}
 \boxed{\;\;\mathbf{I}_a \;=\; Y^{(1)} \, \mathbf{V}_a\;\;}
 \end{equation*}
-where $Y^{(1)} = Y_{aa} + a \, Y_{ab} + a^2 \, Y_{ac}$ is the \emph{positive-sequence admittance}.
+where $Y^{(1)} = Y_{aa} + a^2 \, Y_{ab} + a \, Y_{ac}$ is the \emph{positive-sequence admittance} for $V_b=a^2V_a$, $V_c=aV_a$.
 \end{frame}
 
 % ============================================================
@@ -363,24 +363,23 @@ $\sim 3\times$ fewer variables, $\sim 9\times$ smaller admittance matrix, much f
 \end{frame}
 
 % ============================================================
-\begin{frame}{How big are the errors, typically?}
+\begin{frame}{How to judge whether balance is adequate}
 \centering
 \small
-\begin{tabular}{lcc}
+\begin{tabular}{p{0.42\textwidth}p{0.22\textwidth}p{0.26\textwidth}}
 \toprule
-Scenario & Bal.\ PF voltage error & Bal.\ PF safe to use? \\
+Scenario & Expected phase asymmetry & Recommended model \\
 \midrule
-HV transmission, transposed & $< 0.5\%$ & \checkitem \\
-MV distribution, transposed, balanced loads & 0.5--2\% & \checkitem \\
-LV three-phase industrial & 1--3\% & usually \\
-LV residential, mild unbalance & 2--5\% & for planning only \\
-LV with 30\% single-phase PV & 5--10\% & \warnitem \\
-LV microgrid with single-phase DER + EV & $>$ 10\%, can hide violations & \warnitem\,\warnitem \\
+Transposed network with balanced three-phase devices & low & balanced PF is usually appropriate \\
+Planning study using aggregated phase totals & study-dependent & compare against a 3-phase benchmark \\
+LV feeder with single-phase loads, PV, or EV & material & unbalanced 3-phase PF \\
+Neutral/grounding effects or phase-specific protection & material & unbalanced 3-phase PF \\
+Unbalanced faults & intrinsic & sequence/phase-domain fault model \\
 \bottomrule
 \end{tabular}
 \vspace{0.6em}
 \begin{block}{Practical recipe}
-If the worst case you care about can be hidden by a 5\% voltage error, you cannot use balanced PF. In a project like ours -- where N-1 contingencies create phase-specific risks -- the answer is always L04.
+Do not assume an error percentage from voltage level alone. Compare balanced and three-phase results on representative operating points, then decide whether the approximation preserves the limits relevant to the study.
 \end{block}
 \end{frame}
 
@@ -427,14 +426,14 @@ Total load at bus 2 is the same in both scenarios:
 \toprule
  & $|V_a|$ at bus 2 & $|V_b|$ at bus 2 & $|V_c|$ at bus 2 \\
 \midrule
-\textbf{What balanced PF reports} (both scenarios) & 0.993 & 0.993 & 0.993 \\
-\textbf{What 3$\phi$ PF says, Scenario A} (truly balanced) & 0.993 & 0.993 & 0.993 \\
+\textbf{What balanced PF reports} (both scenarios) & 0.979 & 0.979 & 0.979 \\
+\textbf{What 3$\phi$ PF says, Scenario A} (truly balanced) & 0.979 & 0.979 & 0.979 \\
 \textbf{What 3$\phi$ PF says, Scenario B} (load on A only) & \textbf{0.908} & 1.029 & 0.995 \\
 \bottomrule
 \end{tabular}
 \vspace{0.5em}
 \begin{alertblock}{The lie}
-For Scenario B, balanced PF reports ``$V = 0.993$, no violation anywhere''. The true phase-A voltage is $0.908$ -- well below the $0.95$ limit. \textbf{Phase A is in violation and the balanced model cannot see it.} L04 will derive these numbers from scratch using symmetrical components.
+For Scenario B, balanced PF reports ``$V = 0.979$, no violation anywhere''. The true phase-A voltage is $0.908$ -- well below the $0.95$ limit. \textbf{Phase A is in violation and the balanced model cannot see it.} L04 will derive these numbers from scratch using symmetrical components.
 \end{alertblock}
 \end{frame}
 
@@ -452,7 +451,7 @@ For Scenario B, balanced PF reports ``$V = 0.993$, no violation anywhere''. The 
 \fill[gray!60] (0.2,0) rectangle (0.7,2.02); \node at (0.45,-0.2) {A};
 \fill[gray!60] (0.9,0) rectangle (1.4,2.02); \node at (1.15,-0.2) {B};
 \fill[gray!60] (1.6,0) rectangle (2.1,2.02); \node at (1.85,-0.2) {C};
-\node[font=\tiny] at (1.15, 2.2) {all at 0.993};
+\node[font=\tiny] at (1.15, 2.2) {all at 0.979};
 \node[darkgreen, font=\scriptsize] at (1.15, -0.7) {``no violation''};
 \end{scope}
 % Right: actual 3-phase result
@@ -482,12 +481,12 @@ Same network. Same total load. Two solvers tell you different stories. In a safe
 
 \begin{frame}{A two-line decision tree}
 \centering
-\begin{tikzpicture}[node distance=0.6cm and 1.3cm, every node/.style={font=\scriptsize}]
+\begin{tikzpicture}[node distance=0.7cm and 0.5cm, every node/.style={font=\scriptsize}]
 \tikzset{q/.style={draw, rounded corners, align=center, fill=blue!10, minimum width=4.2cm, minimum height=0.8cm}}
-\tikzset{a/.style={draw, rounded corners, align=center, minimum width=3.8cm, minimum height=0.7cm}}
+\tikzset{a/.style={draw, rounded corners, align=center, minimum width=3.4cm, minimum height=0.7cm}}
 \node[q] (q1) {Are loads, DER, and lines all symmetric on the three phases?};
-\node[a, fill=green!12, below left=of q1, xshift=-1.5cm] (yes) {YES \\ use balanced PF (\code{runpp})};
-\node[a, fill=red!12, below right=of q1, xshift=1.5cm] (no)  {NO \\ use three-phase PF (\code{runpp\_3ph})};
+\node[a, fill=green!12, below left=of q1] (yes) {YES \\ use balanced PF (\code{runpp})};
+\node[a, fill=red!12, below right=of q1] (no)  {NO \\ use three-phase PF (\code{runpp\_3ph})};
 \draw[->, thick] (q1.south) -- node[left, font=\tiny, xshift=-0.3cm]{yes} (yes.north);
 \draw[->, thick] (q1.south) -- node[right, font=\tiny, xshift=0.3cm]{no} (no.north);
 \end{tikzpicture}
@@ -498,19 +497,23 @@ If you can answer ``yes'' confidently and the cost of being wrong is low (planni
 \end{frame}
 
 % ============================================================
-\begin{frame}[fragile]{pandapower preview: same network, two calls}
+\begin{frame}[fragile,shrink=12]{pandapower preview: same network, two calls}
 \begin{lstlisting}[language=Python]
 import pandapower as pp
 
 # Build a small balanced system (same as L01)
-net = pp.create_empty_network()
+net = pp.create_empty_network(sn_mva=1.0)
 b1 = pp.create_bus(net, vn_kv=0.4)
 b2 = pp.create_bus(net, vn_kv=0.4)
-pp.create_ext_grid(net, bus=b1, vm_pu=1.0)
+pp.create_ext_grid(net, bus=b1, vm_pu=1.0,
+    s_sc_max_mva=10, rx_max=0.1,
+    x0x_max=1.0, r0x0_max=0.1)
 pp.create_line_from_parameters(net, b1, b2, length_km=1,
     r_ohm_per_km=0.08, x_ohm_per_km=0.08,
-    c_nf_per_km=0.0, max_i_ka=0.4)
-pp.create_load(net, bus=b2, p_mw=0.6, q_mvar=0.0)
+    c_nf_per_km=0.0, max_i_ka=0.4,
+    r0_ohm_per_km=0.16, x0_ohm_per_km=0.16,
+    c0_nf_per_km=0.0)
+pp.create_load(net, bus=b2, p_mw=0.06, q_mvar=0.0)
 
 # --- Balanced PF (single voltage per bus) ---
 pp.runpp(net)
@@ -568,7 +571,8 @@ print(net.res_bus_3ph[["vm_a_pu", "vm_b_pu", "vm_c_pu",
   \item \textbf{Kersting,} \emph{Distribution System Modeling and Analysis}. Cases where balanced analysis breaks down in distribution.
   \item \textbf{Fortescue, 1918.} \emph{Method of Symmetrical Co-ordinates Applied to the Solution of Polyphase Networks}, AIEE Trans. The original sequence-components paper.
   \item \textbf{pandapower docs:} ``Balanced AC Power Flow'' and ``Asymmetric / Three-phase Power Flow'' pages.
-  \item \textbf{IEEE Std 1159-2019,} \emph{Recommended Practice for Monitoring Electric Power Quality}. VUF definitions and limits.
+  \item \textbf{IEC 61000-4-30,} \emph{Power quality measurement methods}. Negative-to-positive-sequence VUF definition.
+  \item \textbf{IEC 61000-2-2,} compatibility levels for low-frequency conducted disturbances in public LV systems.
 \end{itemize}
 \end{frame}
 

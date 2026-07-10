@@ -42,7 +42,7 @@ The dataset is generated using a microgrid-like teaching feeder. Scenario genera
 Engineering rules, logistic regression, random forest, gradient boosting, and MLP baselines are trained using no-leakage base-case features.
 
 \subsection{Physics-informed MLP}
-The PI-MLP predicts a violation probability, severity score, and component margins. The loss combines classification, severity, component-margin, consistency, and ranking losses.
+The PI-MLP predicts a violation probability, severity score, and component margins. The loss combines classification, severity, component-margin, component-severity consistency, probability-severity consistency, and ranking terms.
 
 \subsection{Phase-aware GNN}
 The GNN uses bus-level phase-channel node features, line edge features, and contingency masks to produce a graph-level risk score.

@@ -1,0 +1,7 @@
+threshold,TP,FP,TN,FN,recall,precision,fnr,pf_calls_saved_fraction,missed_violations,auprc,auroc,cv_type,fold,n_train,n_val,n_test,n_test_groups,test_groups,selected_threshold,group_disjoint
+0.32,18,2,8,5,0.782608695652174,0.9,0.21739130434782608,0.3939393939393939,5,0.9623371743206393,0.9043478260869564,scenario_id,1,33,11,33,3,base|high_load|stress_unbalance,0.32,True
+0.095,12,5,5,0,1.0,0.7058823529411765,0.0,0.22727272727272727,0,1.0,1.0,scenario_id,2,41,14,22,2,evening_peak_bess_discharge|phase_b_heavy,0.095,True
+0.0,12,10,0,0,1.0,0.5454545454545454,0.0,0.0,0,0.8633975433607787,0.825,scenario_id,3,41,14,22,2,bess_charging|high_pv_midday,0.0,True
+0.005,13,6,6,3,0.8125,0.6842105263157895,0.1875,0.32142857142857145,3,0.6410938406923314,0.5729166666666666,contingency_id,1,36,13,28,4,line_0_out|line_3_out|pcc_outage|pv_2_trip,0.005,True
+0.01,16,5,7,0,1.0,0.7619047619047619,0.0,0.25,0,0.9901315789473684,0.984375,contingency_id,2,36,13,28,4,bess_trip|line_2_out|line_7_out|pv_1_trip,0.01,True
+0.615,7,0,6,8,0.4666666666666667,1.0,0.5333333333333333,0.6666666666666666,8,1.0,1.0,contingency_id,3,42,14,21,3,line_1_out|line_6_out|pv_0_trip,0.615,True

@@ -3,16 +3,20 @@ channels:
   - conda-forge
 dependencies:
   - python=3.11
-  - pandapower>=3.2
-  - numpy<2
-  - pandas<2.3
-  - scipy<1.14
-  - scikit-learn
-  - matplotlib
-  - networkx
+  # Versions below match the executed notebooks and release audit.
+  - pandapower=3.2.1
+  - numpy=1.26.4
+  - pandas=2.2.3
+  - scipy=1.13.1
+  - scikit-learn=1.8.*
+  - matplotlib=3.10.*
+  - networkx=3.6.*
   - numba
   - pillow
-  - pytorch
+  - pytorch=2.10.*
   - jupyter
   - ipykernel
   - nbconvert
+  - nbclient
+  - nbformat
+  - packaging

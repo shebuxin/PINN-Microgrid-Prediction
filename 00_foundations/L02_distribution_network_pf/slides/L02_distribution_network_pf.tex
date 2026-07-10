@@ -460,7 +460,7 @@ For a radial branch from bus $i$ to bus $j$ carrying complex power $P_{ij} + jQ_
 Two terms:
 \begin{itemize}
   \item $2(R P + X Q)$ -- the dominant ``voltage drop'' term, linear in $P, Q$.
-  \item $|Z|^2 \cdot |I|^2$ -- the ``loss'' term, quadratic in current. Small when V is near 1 and losses are a few percent.
+  \item $|Z|^2 \cdot |I|^2$ -- the squared-current correction. It is related to branch losses but has units of squared voltage in this equation.
 \end{itemize}
 \vspace{0.5em}
 \begin{block}{LinDistFlow (Baran \& Wu, 1989)}
@@ -492,16 +492,16 @@ $3 \to 4$ & 0.20 & 0.08 & $0.04(0.20)+0.06(0.08)\!=\!0.013$ & 0.954 \\
 \small
 \begin{tabular}{lcc}
 \toprule
-Bus & $|V|$ from BFS & $|V|$ from LinDistFlow \\
+Bus & $|V|$ from converged BFS & $|V|$ from LinDistFlow \\
 \midrule
-2 & 0.984 & 0.984 \\
-3 & 0.967 & 0.967 \\
-4 & 0.954 & 0.954 \\
+2 & 0.983 & 0.984 \\
+3 & 0.964 & 0.967 \\
+4 & 0.951 & 0.954 \\
 \bottomrule
 \end{tabular}
 \vspace{0.5em}
 \begin{block}{Why they agree so well}
-On this feeder, voltages are close to 1.0 pu and losses are a fraction of a percent. The neglected $|Z|^2|I|^2$ term is in the 4th decimal place.
+On this feeder, LinDistFlow is close but slightly optimistic: the largest voltage-magnitude difference is about $0.003$ pu. The approximation is useful for planning intuition, not a replacement for the converged nonlinear result near a limit.
 \end{block}
 \end{frame}
 

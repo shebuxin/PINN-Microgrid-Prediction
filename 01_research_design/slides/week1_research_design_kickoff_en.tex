@@ -120,7 +120,7 @@ Most undergrad courses are textbook-mode. This one is research-mode \emph{applie
 \end{frame}
 
 % ============================================================
-\begin{frame}{Project-driven: working backward from the paper}
+\begin{frame}[shrink=7]{Project-driven: working backward from the paper}
 The mini-paper at Week 8 is the destination. We work backward to figure out what each earlier week must produce:
 \vspace{0.4em}
 \centering
@@ -222,8 +222,8 @@ Most contingencies do \emph{not} cause violations. If a fast model can prune the
 % ============================================================
 \begin{frame}{The screening idea}
 \centering
-\begin{tikzpicture}[node distance=0.7cm and 0.9cm, every node/.style={font=\scriptsize}]
-\tikzset{box/.style={draw, rounded corners, align=center, minimum width=2.5cm, minimum height=0.75cm, fill=blue!6}}
+\begin{tikzpicture}[node distance=0.5cm, every node/.style={font=\scriptsize}]
+\tikzset{box/.style={draw, rounded corners, align=center, minimum width=2.2cm, minimum height=0.75cm, fill=blue!6}}
 \tikzset{arrow/.style={-{Latex[length=2mm]}, thick}}
 \node[box] (state) {Operating state\\$x_t$};
 \node[box, right=of state] (cont) {Contingency\\$c$};
@@ -412,9 +412,9 @@ VSCode + mamba is reproducible across macOS, Linux, and Windows, supports Jupyte
   \item Works exactly the same on macOS, Linux, and inside Docker.
 \end{itemize}
 \vspace{0.4em}
-\textbf{macOS / Linux (recommended one-liner):}
+\textbf{macOS / Linux (official automatic installer):}
 \begin{lstlisting}
-"${SHELL}" <(curl -L micro.mamba.pm/install.sh)
+"${SHELL}" <(curl -L micro.mamba.pm)
 \end{lstlisting}
 Follow the prompts. The installer adds a \code{micromamba} entry to your shell config (usually \code{\~{}/.zshrc} or \code{\~{}/.bashrc}). Restart the shell after install.
 \vspace{0.4em}
@@ -445,24 +445,20 @@ WSL gives a consistent experience with the macOS/Linux instructions used through
 
 % ============================================================
 \begin{frame}[fragile]{Step 3: Create the \code{pdpower} environment}
-Run the following \emph{one} command in your terminal:
+From the repository root, create the tested environment:
 \begin{lstlisting}
-micromamba create -n pdpower -c conda-forge -y \
-  python=3.11 "pandapower>=3.2" "numpy<2" \
-  "pandas<2.3" "scipy<1.14" scikit-learn \
-  matplotlib networkx numba pillow pytorch \
-  jupyter ipykernel nbconvert
+micromamba create -f environment.yml -y
 \end{lstlisting}
 \vspace{0.3em}
-This installs everything we need for the eight weeks:
+The versioned file installs the stack used to generate the reference outputs:
 \begin{itemize}
-  \item \code{pandapower>=3.2} -- provides \code{runpp\_3ph} for unbalanced PF.
-  \item \code{numpy<2}, \code{pandas<2.3}, \code{scipy<1.14} -- pinned for pandapower compatibility.
+  \item Python 3.11 and \code{pandapower=3.2.1};
+  \item NumPy 1.26.4, pandas 2.2.3, and SciPy 1.13.1;
   \item \code{pytorch} -- CPU build is fine for this course.
   \item \code{scikit-learn}, \code{matplotlib}, \code{networkx}, \code{numba}, \code{pillow}.
   \item \code{jupyter}, \code{ipykernel}, \code{nbconvert} -- so VSCode can run notebooks.
 \end{itemize}
-First run downloads $\sim$1.5 GB and takes 5--10 minutes.
+Using the checked-in file avoids silent dependency drift between students.
 \end{frame}
 
 % ============================================================
@@ -471,9 +467,11 @@ First run downloads $\sim$1.5 GB and takes 5--10 minutes.
 micromamba activate pdpower
 python --version              # Python 3.11.x
 python -c "import pandapower as pp; print(pp.__version__)"
-# 3.2.1 or higher
+# 3.2.1
 python -c "import torch; print(torch.__version__)"
-# 2.x
+# 2.10.x
+python -m ipykernel install --user --name pdpower \
+  --display-name "Python (pdpower)"
 \end{lstlisting}
 \vspace{0.4em}
 Quick three-phase power-flow check:
@@ -494,8 +492,8 @@ You should see \code{converged: True buses: 907}.
 \begin{enumerate}
   \item Save the \code{.ipynb} file your instructor shared into a folder of your choice.
   \item Open VSCode. Use \code{File $\rightarrow$ Open File...} and select the notebook.
-  \item Open the command palette (\code{Cmd/Ctrl+Shift+P}) and run \textbf{Python: Select Interpreter}.
-  \item Choose the interpreter under \code{.../envs/pdpower/bin/python}.
+  \item In the notebook kernel picker, choose \textbf{Python (pdpower)}.
+  \item If it is missing, rerun the \code{ipykernel install} command from Step 4 and reload VSCode.
   \item Click \textbf{Run All} at the top of the notebook.
 \end{enumerate}
 \vspace{0.6em}
@@ -527,8 +525,8 @@ If you see this, your environment can execute the course notebooks end-to-end.
 \begin{enumerate}
   \item \warnitem Installing pandapower via \code{pip} on top of system Python. Always create and activate \code{pdpower} first.
   \item \warnitem Using a Python interpreter other than \code{pdpower} in VSCode. Always check the interpreter shown in the bottom-right corner.
-  \item \warnitem Installing pandapower 2.x. The course notebooks use 3.x column names (\code{pl\_a\_mw}, \code{ql\_a\_mvar}); 2.x will crash on the first PF result cell.
-  \item \warnitem Installing NumPy 2.x. pandapower still imports \code{np.Inf}; pin \code{numpy<2}.
+  \item \warnitem Installing a different pandapower release and comparing its output byte-for-byte with the reference notebooks. Use \code{environment.yml} for reproducibility.
+  \item \warnitem Looking only in \textbf{Python: Select Interpreter}. VSCode's Jupyter kernel picker uses a separate discovery path, so register the \code{pdpower} kernel explicitly.
   \item \warnitem Running notebooks on Apple Silicon with a stale x86 conda. Reinstall micromamba native to your CPU.
   \item \warnitem Forgetting to \code{micromamba activate pdpower} before launching Jupyter or running Python.
 \end{enumerate}

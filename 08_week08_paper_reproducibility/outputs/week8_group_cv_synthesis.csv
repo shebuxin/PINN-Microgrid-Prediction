@@ -1,7 +1,7 @@
 stage,model,cv_type,folds,mean_recall,mean_fnr,mean_pf_calls_saved,mean_auprc,missed_violations_sum
 Week 5 ML baseline,EngineeringRule,scenario_group,3,1.0,0.0,0.3232323232323232,0.9117889833278848,0.0
 Week 5 ML baseline,AllUnsafe,scenario_group,3,1.0,0.0,0.0,0.5959595959595959,0.0
-Week 5 ML baseline,LogisticRegression,scenario_group,3,0.927536231884058,0.072463768115942,0.4393939393939394,0.9902595455518992,5.0
+Week 5 ML baseline,LogisticRegression,scenario_group,3,0.927536231884058,0.072463768115942,0.4393939393939394,0.990366634864386,5.0
 Week 5 ML baseline,RandomForest,scenario_group,3,0.8985507246376812,0.1014492753623188,0.4747474747474747,0.9896867094403108,7.0
 Week 5 ML baseline,EngineeringRule,contingency_group,3,1.0,0.0,0.3095238095238095,0.9708347497409998,0.0
 Week 5 ML baseline,AllUnsafe,contingency_group,3,1.0,0.0,0.0,0.6190476190476191,0.0

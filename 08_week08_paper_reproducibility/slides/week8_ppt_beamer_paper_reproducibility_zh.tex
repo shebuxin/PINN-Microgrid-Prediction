@@ -5,13 +5,13 @@
 \usefonttheme{professionalfonts}
 \usepackage{amsmath,amssymb,bm,booktabs,array,graphicx,hyperref,multicol}
 \usepackage{xcolor,xeCJK,fontspec}
-\graphicspath{{/mnt/data/week8_outputs_complete/paper/figures/}{/mnt/data/week8_outputs_complete/}}
-\setmainfont{DejaVu Sans}
-\setsansfont{DejaVu Sans}
-\setmonofont{DejaVu Sans Mono}
-\setCJKmainfont{Noto Sans CJK SC}
-\setCJKsansfont{Noto Sans CJK SC}
-\setCJKmonofont{Noto Sans CJK SC}
+\graphicspath{{../outputs/paper/figures/}{../outputs/}}
+\setmainfont{texgyreheros-regular.otf}[BoldFont=texgyreheros-bold.otf,ItalicFont=texgyreheros-italic.otf]
+\setsansfont{texgyreheros-regular.otf}[BoldFont=texgyreheros-bold.otf,ItalicFont=texgyreheros-italic.otf]
+\setmonofont{lmmono10-regular.otf}[BoldFont=lmmonolt10-bold.otf]
+\setCJKmainfont{FandolHei-Regular.otf}
+\setCJKsansfont{FandolHei-Regular.otf}
+\setCJKmonofont{FandolFang-Regular.otf}
 \definecolor{myblue}{RGB}{36,88,135}
 \definecolor{mygreen}{RGB}{40,120,80}
 \definecolor{myorange}{RGB}{180,100,30}
@@ -365,17 +365,17 @@ $k$ & PF call fraction & Mean recall@k & Min recall@k & Severe hit@k \\
 
 \begin{frame}{Figure: Top-k Violation Recall}
 \centering
-\includegraphics[width=0.82\textwidth]{fig5_week7_topk_violation_recall.png}
+\includegraphics[height=0.76\textheight,keepaspectratio]{fig5_week7_topk_violation_recall.png}
 \end{frame}
 
 \begin{frame}{Figure: Group CV Recall}
 \centering
-\includegraphics[width=0.82\textwidth]{fig6_week7_group_cv_recall.png}
+\includegraphics[height=0.76\textheight,keepaspectratio]{fig6_week7_group_cv_recall.png}
 \end{frame}
 
 \begin{frame}{Figure: True vs Predicted Severity}
 \centering
-\includegraphics[width=0.82\textwidth]{fig7_week6_true_vs_predicted_severity.png}
+\includegraphics[height=0.76\textheight,keepaspectratio]{fig7_week6_true_vs_predicted_severity.png}
 \end{frame}
 
 \begin{frame}{Validation Suite Summary}

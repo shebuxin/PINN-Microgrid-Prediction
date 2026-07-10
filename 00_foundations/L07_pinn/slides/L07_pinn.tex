@@ -161,7 +161,7 @@ For PDE problems: sample uniformly on the domain. For our project: random scenar
 \end{frame}
 
 % ============================================================
-\begin{frame}{The penalty coefficient $\lambda$}
+\begin{frame}[shrink=4]{The penalty coefficient $\lambda$}
 \centering
 \begin{tikzpicture}[every node/.style={font=\scriptsize}]
 \draw[->, thick] (-0.2,0) -- (8.2,0) node[right]{$\lambda$};
@@ -288,19 +288,20 @@ If the model directly actuates an inverter or relay, we want hard constraints, c
 \section*{4. The project's limit-aware flavor}
 
 \begin{frame}{What ``physics-informed'' means in this project}
-The microgrid project does \emph{not} encode the full AC power-flow residual into the loss. Instead, it uses \textbf{five engineering-limit penalties}, each on a quantity that the simulator already gives us.
+The microgrid project does \emph{not} encode the full AC power-flow residual into the loss. It builds five nonnegative component-margin targets from simulator outputs, then adds supervised auxiliary and consistency losses.
 \vspace{0.4em}
 \centering
 \small
 \begin{tabular}{lll}
 \toprule
-Term & Quantity & Penalty form \\
+Target / term & Quantity & Definition or loss \\
 \midrule
-$\mathcal{L}_{\text{V-lim}}$ & per-phase voltage $V_{i,\phi}$ vs $[0.95, 1.05]$ & $\max(0, V_{\min} - V)^2 + \max(0, V - V_{\max})^2$ \\
-$\mathcal{L}_{\text{I-lim}}$ & per-phase loading $\ell_\phi$ vs 100\% & $\max(0, \ell - 1.0)^2$ \\
-$\mathcal{L}_{\text{VUF}}$ & voltage unbalance vs 2\% & $\max(0, \text{VUF} - 0.02)^2$ \\
+$m_{V,low},m_{V,high}$ & minimum/maximum phase voltage & normalized positive-part margins \\
+$m_I$ & maximum phase loading vs 100\% & $[L_{max}/100-1]_+$ \\
+$m_U$ & sequence VUF vs 2\% & $[U_{max}/2-1]_+$ (VUF in percent) \\
+$m_S$ & service loss / no-slack flags & maximum topology-risk flag \\
 $\mathcal{L}_{\text{cls}}$ & probability head $\hat{p}$ vs label & weighted BCE \\
-$\mathcal{L}_{\text{sev}}$ & severity head $\hat{s}$ vs severity score & MSE \\
+$\mathcal{L}_{\text{comp}}$ & predicted vs target margins & SmoothL1 on $\log(1+m)$ \\
 \bottomrule
 \end{tabular}
 \vspace{0.5em}
@@ -313,12 +314,12 @@ This is \emph{limit-aware} learning rather than strict Raissi-PINN. The same nam
 \begin{frame}{Severity regression as physics-informed}
 Instead of only predicting a binary label, also predict a \emph{continuous severity score}:
 \begin{equation*}
-s = \max\!\left(\, \tfrac{0.95 - V_{\min}}{0.05},\; \tfrac{\ell_{\max} - 1.0}{0.5},\; \tfrac{\text{VUF} - 0.02}{0.02} \,\right) \cdot \mathbb{I}(\text{any limit crossed})
+s_{PI}=\max\{s_{raw},m_{V,low},m_{V,high},m_I,m_U,m_S\}
 \end{equation*}
 \vspace{0.2em}
 \begin{itemize}
   \item Larger $s$ means worse violation; $s = 0$ means safe.
-  \item The severity head learns to predict $s$ via MSE loss.
+  \item The severity head learns $s_{PI}$ with SmoothL1 loss after a $\log(1+s)$ transform.
   \item The classification head and severity head share the backbone, so the two tasks help each other.
 \end{itemize}
 \vspace{0.4em}
@@ -334,23 +335,23 @@ For pre-screening, the \emph{order} of risk scores matters more than absolute pr
 \begin{equation*}
 \mathcal{L}_{\text{rank}} \;=\; \tfrac{1}{|\mathcal{P}|} \sum_{(i, j) \in \mathcal{P}} \max\!\bigl(0, \;m - (\hat{y}_i - \hat{y}_j)\bigr)
 \end{equation*}
-where $\mathcal{P} = \{(i, j) : y_i = 1, y_j = 0\}$ is the set of (unsafe, safe) pairs and $m$ is a margin (e.g.\ $m=0.2$).
+In Week 6, pairs are ordered by continuous target severity: $(i,j)\in\mathcal P$ when $s_i>s_j$. The model ranks the predicted severity head with margin $m=0.05$.
 \vspace{0.3em}
 \begin{itemize}
-  \item Pairwise hinge: penalizes pairs where the unsafe scenario has a \emph{lower} score than a safe one.
-  \item Pushes unsafe scores above safe scores by at least margin $m$.
+  \item Pairwise hinge penalizes a more severe case receiving a lower predicted severity.
+  \item It pushes the higher-severity score above the lower one by at least margin $m$.
   \item Improves top-$k$ hit rate, which is the project's actual operational metric.
 \end{itemize}
 \vspace{0.3em}
-\begin{block}{Why this is ``physics-informed'' in spirit}
-The desired ordering (\emph{more dangerous on top}) is itself a physical property of the system, not just a statistical convenience. Encoding it explicitly is a form of inductive bias.
+\begin{block}{What kind of prior is this?}
+The ranking term is task-aware rather than a physical residual. It is included because the deployment objective is contingency prioritization; the physical content enters through the severity and component-margin targets.
 \end{block}
 \end{frame}
 
 % ============================================================
 \section*{5. Worked example -- regularizing an MLP with safety rules}
 
-\begin{frame}{Toy problem: predict ``safe'' from $V$ and current loading $\ell$}
+\begin{frame}[shrink=4]{Toy problem: predict ``safe'' from $V$ and current loading $\ell$}
 \textbf{Ground-truth rule.} A state $(V, \ell)$ is \textbf{unsafe} iff $V < 0.95$ \emph{or} $\ell > 1.0$. Otherwise safe.\\[0.2em]
 \textbf{Training data.} Only 30 labeled scenarios, clustered near the boundary at $(V, \ell) \in [0.93, 1.02] \times [0.85, 1.05]$. \emph{No labels in the far corners.}
 \vspace{0.4em}
@@ -505,9 +506,10 @@ for epoch in range(200):
 % ============================================================
 \section*{7. Project: Week 6 PI-MLP composite loss}
 
-\begin{frame}{The five losses in Week 6}
+\begin{frame}{The six losses in Week 6}
 \begin{equation*}
-\mathcal{L}_{\text{PI-MLP}} \;=\; \lambda_1 \mathcal{L}_{\text{cls}} + \lambda_2 \mathcal{L}_{\text{sev}} + \lambda_3 \mathcal{L}_{\text{margin}} + \lambda_4 \mathcal{L}_{\text{consistency}} + \lambda_5 \mathcal{L}_{\text{rank}}
+\mathcal{L}=\mathcal{L}_{cls}+\lambda_s\mathcal{L}_{sev}+\lambda_c\mathcal{L}_{comp}
++\lambda_{cons}\mathcal{L}_{cons}+\lambda_p\mathcal{L}_{prob-sev}+\lambda_r\mathcal{L}_{rank}
 \end{equation*}
 \vspace{0.3em}
 \centering
@@ -517,15 +519,16 @@ for epoch in range(200):
 Term & Role & Form \\
 \midrule
 $\mathcal{L}_{\text{cls}}$ & main classifier & weighted BCE \\
-$\mathcal{L}_{\text{sev}}$ & continuous severity signal & MSE on severity head \\
-$\mathcal{L}_{\text{margin}}$ & per-component (V, I, VUF) limit penalty & hinge-squared limit violations \\
-$\mathcal{L}_{\text{consistency}}$ & classification and severity agree & high $\hat{p}$ $\Leftrightarrow$ high $\hat{s}$ \\
+$\mathcal{L}_{\text{sev}}$ & continuous severity signal & log-SmoothL1 \\
+$\mathcal{L}_{\text{comp}}$ & five component-margin targets & log-SmoothL1 \\
+$\mathcal{L}_{\text{cons}}$ & severity covers worst component & $[\max_k\hat m_k-\hat s]_+^2$ \\
+$\mathcal{L}_{\text{prob-sev}}$ & probability/severity agreement & MSE between mapped scores \\
 $\mathcal{L}_{\text{rank}}$ & top-$k$ screening order & pairwise hinge \\
 \bottomrule
 \end{tabular}
 \vspace{0.6em}
 \begin{block}{Default weights used in the notebook}
-$\lambda_1 = 1.0$, $\lambda_2 = 0.5$, $\lambda_3 = 0.3$, $\lambda_4 = 0.2$, $\lambda_5 = 0.3$. Tuned coarsely on validation -- the notebook walks through the sweep.
+$\lambda_s=0.50$, $\lambda_c=0.25$, $\lambda_{cons}=0.20$, $\lambda_p=0.10$, and $\lambda_r=0.20$. These are teaching defaults; the notebook reports an ablation, not an exhaustive hyperparameter claim.
 \end{block}
 \end{frame}
 
@@ -541,7 +544,7 @@ Model variant & Recall & Precision & PF calls saved & Missed violations \\
 \midrule
 BaselineMLP (only $\mathcal{L}_{\text{cls}}$) & 1.000 & 0.857 & 0.300 & 0 \\
 PI-MLP no-rank ($-\mathcal{L}_{\text{rank}}$) & 1.000 & 0.923 & 0.350 & 0 \\
-\textbf{PI-MLP full} (all 5 terms) & \textbf{1.000} & \textbf{1.000} & \textbf{0.400} & \textbf{0} \\
+\textbf{PI-MLP full} (all 6 terms) & \textbf{1.000} & \textbf{1.000} & \textbf{0.400} & \textbf{0} \\
 \bottomrule
 \end{tabular}
 \vspace{0.6em}
@@ -586,7 +589,7 @@ PI-MLP no-rank ($-\mathcal{L}_{\text{rank}}$) & 1.000 & 0.923 & 0.350 & 0 \\
   \item \checkitem I can write the generic PINN loss $\mathcal{L} = \mathcal{L}_{\text{data}} + \lambda \mathcal{L}_{\text{phys}}$ from memory.
   \item \checkitem I can name three reasons to put physics in the loss.
   \item \checkitem I can distinguish a soft constraint from a strict / projected one and pick the right tool.
-  \item \checkitem I can list the five physics-informed terms in the project's PI-MLP and what each does.
+  \item \checkitem I can list the six Week 6 loss terms and distinguish physical targets from task-aware regularizers.
   \item \checkitem I can implement a limit-aware physics loss in PyTorch in $\sim 10$ lines.
   \item \checkitem I can name two scenarios where PINNs help and two where they hurt.
   \item \checkitem I can read the Week 6 ablation table and explain which loss term contributes which gain.

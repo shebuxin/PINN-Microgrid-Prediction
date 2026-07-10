@@ -1,5 +1,5 @@
 check,passed,detail
-cv_evidence_synthesis,True,/mnt/data/week8_outputs_complete/week8_cv_evidence_synthesis.csv
-final_package_manifest,True,/mnt/data/week8_outputs_complete/week8_final_package_manifest.csv
+cv_evidence_synthesis,True,08_week08_paper_reproducibility/outputs/week8_cv_evidence_synthesis.csv
+final_package_manifest,True,08_week08_paper_reproducibility/outputs/week8_final_package_manifest.csv
 cv_evidence_metrics_bounded,True,"CV metrics are in [0,1]"
 final_package_manifest_nonempty,True,8 package items listed

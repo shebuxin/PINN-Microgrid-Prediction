@@ -225,7 +225,7 @@ Y_{\text{bus}} = G + jB \quad \in \mathbb{C}^{N \times N}
 \end{equation*}
 \begin{block}{Properties}
 \begin{itemize}
-  \item Symmetric: $Y_{ij} = Y_{ji}$.
+  \item Symmetric for reciprocal branches without phase-shifting effects: $Y_{ij}=Y_{ji}$.
   \item Sparse for real networks (each bus connects to a few neighbours).
   \item Pre-computed once at the start of a power-flow solve.
 \end{itemize}
@@ -244,7 +244,7 @@ P_i &= \sum_j |V_i| |V_j| |Y_{ij}| \cos(\theta_i - \theta_j - \alpha_{ij}) \\
 Q_i &= \sum_j |V_i| |V_j| |Y_{ij}| \sin(\theta_i - \theta_j - \alpha_{ij})
 \end{align*}
 \begin{alertblock}{The key observation}
-These equations are \emph{nonlinear} in $|V|$ and $\theta$ --- products of voltage terms and trig functions. No closed-form solution. We must iterate.
+These equations are \emph{nonlinear} in $|V|$ and $\theta$ --- products of voltage terms and trig functions. There is no general closed-form solution for an arbitrary network, so practical solvers iterate.
 \end{alertblock}
 \end{frame}
 
@@ -308,14 +308,14 @@ J = \begin{bmatrix}
   \item Sparse LU or iterative solver handles $J \Delta x = -F$ efficiently.
 \end{itemize}
 \begin{alertblock}{Variants you will see}
-``Decoupled PF'' and ``fast-decoupled PF'' approximate $J$ by zeroing off-diagonal blocks. Faster per iteration, slightly more iterations. Default in many tools.
+``Decoupled PF'' and ``fast-decoupled PF'' approximate $J$ by neglecting weak coupling blocks. They can reduce work per iteration, but convergence depends strongly on the network; pandapower's default balanced AC solver is Newton--Raphson.
 \end{alertblock}
 \end{frame}
 
 % ============================================================
 \begin{frame}{What can go wrong}
 \begin{enumerate}
-  \item \warnitem \textbf{Non-convergence.} The solver hits the iteration limit. Usually the system is heavily loaded, the topology is bad, or the load exceeds the line capacity.
+  \item \warnitem \textbf{Non-convergence.} The solver hits the iteration limit. Common causes include a missing slack, islanding, bad input data, or an operating point near voltage collapse. A thermal rating itself is not part of the PF equations.
   \item \warnitem \textbf{Multiple solutions.} NR finds one. If the initial guess is far from the operating point, you might land on the wrong root.
   \item \warnitem \textbf{Singular Jacobian.} Happens near voltage collapse (the ``nose'' of the PV curve).
   \item \warnitem \textbf{Bad input data.} Mistyped impedance, missing slack, isolated bus, wrong base voltage.
@@ -404,11 +404,11 @@ pp.create_ext_grid(net, bus=b1, vm_pu=1.0)
 pp.create_line_from_parameters(
     net, b1, b2, length_km=1.0,
     r_ohm_per_km=0.08, x_ohm_per_km=0.24,
-    c_nf_per_km=0.0, max_i_ka=0.4)
+    c_nf_per_km=0.0, max_i_ka=10.0)
 pp.create_line_from_parameters(
     net, b2, b3, length_km=1.0,
     r_ohm_per_km=0.12, x_ohm_per_km=0.32,
-    c_nf_per_km=0.0, max_i_ka=0.4)
+    c_nf_per_km=0.0, max_i_ka=10.0)
 
 pp.create_load(net, bus=b2, p_mw=1.5, q_mvar=0.6)
 pp.create_load(net, bus=b3, p_mw=1.0, q_mvar=0.4)

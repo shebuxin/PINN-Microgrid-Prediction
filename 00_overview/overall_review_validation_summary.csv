@@ -1,21 +1,33 @@
 check,passed,detail
-final_executed_notebooks_have_no_error_outputs,True,"8 notebooks checked; executed_code_cells=[20, 18, 10, 14, 17, 20, 13, 21]; errors=0"
+fresh_copy_notebook_execution,True,15/15 clean notebooks executed from a fresh repository copy
+weekly_clean_executed_source_parity,True,8/8 weekly notebook pairs have identical cell types and sources
+clean_notebooks_have_no_outputs,True,8/8 weekly clean notebooks have no outputs or execution counts
+notebook_cell_ids_valid,True,23/23 notebooks have unique nonempty cell IDs
+notebook_code_syntax_valid,True,All Python code cells compile with ast.parse
+notebook_markdown_math_valid,True,No bracket delimiters or escaped control-character corruption remains
+executed_notebooks_have_no_error_outputs,True,8/8 weekly executed notebooks contain no error outputs
+week2_numerical_proofs_within_tolerance,True,Power balance current loading and VUF cross-checks pass
 week3_validation_summary_all_passed,True,12/12 checks passed
 week4_validation_summary_all_passed,True,13/13 checks passed
 week5_validation_summary_all_passed,True,12/12 checks passed
 week6_validation_summary_all_passed,True,16/16 checks passed
 week7_validation_summary_all_passed,True,44/44 checks passed
 week8_validation_summary_all_passed,True,22/22 checks passed
-week2_numerical_proofs_within_tolerance,True,"max_vuf=1.60e-14, max_p=6.56e-09, max_current=8.33e-17, max_loading=5.19e-08"
-week4_dataset_sample_count_matches_scenarios_times_contingencies,True,7 scenarios x 11 contingencies = 77; rows=77
-week4_label_distribution_has_safe_and_unsafe,True,"labels={True: 47, False: 30}"
-week5_ml_dataset_preserves_week4_rows,True,"week5_rows=77, week4_rows=77"
-week5_feature_list_no_obvious_post_contingency_leakage,True,32 features; suspicious=[]
-week_1_pdf_compiled_expected_pages,True,"pages=31, expected=31, size_bytes=354223"
-week_2_pdf_compiled_expected_pages,True,"pages=35, expected=35, size_bytes=336072"
-week_3_pdf_compiled_expected_pages,True,"pages=34, expected=34, size_bytes=225630"
-week_4_pdf_compiled_expected_pages,True,"pages=40, expected=40, size_bytes=301449"
-week_5_pdf_compiled_expected_pages,True,"pages=36, expected=36, size_bytes=514621"
-week_6_pdf_compiled_expected_pages,True,"pages=41, expected=41, size_bytes=384848"
-week_7_pdf_compiled_expected_pages,True,"pages=37, expected=37, size_bytes=493372"
-week_8_pdf_compiled_expected_pages,True,"pages=42, expected=42, size_bytes=470467"
+week4_dataset_sample_count,True,7 scenarios x 11 contingencies = 77 rows
+week4_label_distribution,True,30 safe and 47 unsafe samples
+week4_execution_categories,True,35 PF-solved + 35 service-loss skipped + 7 no-slack skipped = 77
+feature_leakage_audits,True,Week 5-8 leakage checks pass
+portable_source_paths,True,No external temporary path remains in notebook or TeX sources
+portable_manifest_paths,True,Generated manifests use repository-relative paths
+latex_main_entry_compilation,True,20/20 main TeX entry points compile
+week1_pdf_pages,True,29 pages
+week2_pdf_pages,True,42 pages
+week3_pdf_pages,True,34 pages
+week4_pdf_pages,True,40 pages
+week5_pdf_pages,True,36 pages
+week6_pdf_pages,True,41 pages
+week7_pdf_pages,True,37 pages
+week8_pdf_pages,True,42 pages
+combined_weekly_pdf_pages,True,301 pages
+visual_slide_review,True,All lecture decks reviewed as contact sheets with suspicious pages inspected at full size
+paper_package_compilation,True,Week 8 generated paper and 90_paper_package both compile to 2 pages

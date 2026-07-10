@@ -1,0 +1,13 @@
+{
+  "scenario_table": "03_week03_microgrid_scenario_generation/outputs/week3_scenario_table.csv",
+  "scenario_summary": "03_week03_microgrid_scenario_generation/outputs/week3_scenario_security_summary.csv",
+  "basecase_ai_features": "03_week03_microgrid_scenario_generation/outputs/week3_basecase_ai_features.csv",
+  "validation_summary": "03_week03_microgrid_scenario_generation/outputs/week3_validation_summary.csv",
+  "pv_config": "03_week03_microgrid_scenario_generation/outputs/week3_device_config_pv.csv",
+  "bess_config": "03_week03_microgrid_scenario_generation/outputs/week3_device_config_bess.csv",
+  "figures": [
+    "03_week03_microgrid_scenario_generation/outputs/week3_min_voltage_by_scenario.png",
+    "03_week03_microgrid_scenario_generation/outputs/week3_max_vuf_by_scenario.png",
+    "03_week03_microgrid_scenario_generation/outputs/week3_max_loading_by_scenario.png"
+  ]
+}

@@ -206,7 +206,7 @@ s_I=\left[\frac{\max_{\ell,\phi}\mathrm{loading}_{\ell,\phi}}{100}-1\right]_+
 Manual proof formula:
 
 \[
-\mathrm{loading}_{\ell,\phi}=100\frac{I_{\ell,\phi}}{I_{\ell}^{max}}
+\mathrm{loading}_{\ell,\phi}=100\frac{|I_{\ell,\phi}|}{I_{\ell}^{max}df_\ell n_{\ell,parallel}}
 \]
 
 ---
@@ -228,7 +228,7 @@ s_U=\left[\frac{\max_i\mathrm{VUF}_i}{\mathrm{VUF}^{max}}-1\right]_+
 Teaching threshold:
 
 ```text
-VUFmax = 3 percent
+VUFmax = 2 percent (teaching threshold used consistently in Weeks 2, 4, and 6)
 ```
 
 ---

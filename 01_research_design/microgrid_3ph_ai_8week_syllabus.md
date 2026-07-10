@@ -85,12 +85,13 @@
 
 ### 教学目标
 
-把 IEEE European LV asymmetric network 改造成一个微电网故事，并生成多种运行点。
+先用 9-bus 径向教学 feeder 建立可解释、可验证的场景生成流程，再检查
+`ieee_european_lv_asymmetric` 的公开元数据，作为论文规模扩展的入口。
 
 ### PPT 内容
 
-1. IEEE European LV asymmetric network 介绍；
-2. 如何把 LV feeder 改造成 microgrid case；
+1. 9-bus teaching feeder 与 IEEE European LV asymmetric network 的关系；
+2. 如何把 LV feeder 组织成 microgrid case；
 3. PCC、主变、grid-forming source 的建模；
 4. PV、BESS、diesel generator、critical load 的建模思路；
 5. 并网/孤岛模式切换；
@@ -103,23 +104,23 @@
 
 内容：
 
-- 加载 `ieee_european_lv_asymmetric`；
-- 指定若干 bus 为 critical loads；
-- 加入 PV/BESS/DG/PCC 元素；
-- 生成 100–1000 个运行场景；
+- 检查 `ieee_european_lv_asymmetric` 的规模与公开元数据；
+- 构建含 critical load、PV、BESS 和 PCC 的 9-bus teaching feeder；
+- 生成 7 个确定性场景，并给出固定随机种子的随机采样示例；
 - 运行 base-case runpp_3ph；
 - 保存 base-case feature table。
 
 ### 学生输出
 
-- `base_scenarios.csv`；
+- `week3_scenario_table.csv`；
 - 一个可视化图：不同场景下 min phase voltage、max line current、max VUF 分布。
 
 ## Week 4：三相 N-1 扫描与 violation label 设计
 
 ### 教学目标
 
-让学生能够手写 N-1 扫描，生成每个 operating point × contingency 的 label 和 severity。
+让学生能够手写 N-1 扫描，生成 7 个 operating points × 11 个
+contingencies 的 77 行 label 和 severity 教学数据。
 
 ### PPT 内容
 
@@ -246,12 +247,12 @@
 
 内容：
 
-- 构建 PyTorch Geometric Data；
+- 用 plain PyTorch 构建 graph tensors（不依赖 PyTorch Geometric）；
 - bus-level phase-channel GNN；
 - contingency embedding；
 - graph-level risk prediction；
 - top-k screening；
-- OOD split 实验。
+- scenario-group 与 contingency-group split 实验。
 
 ### 学生输出
 

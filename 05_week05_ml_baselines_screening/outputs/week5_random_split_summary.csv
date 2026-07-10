@@ -1,0 +1,4 @@
+split,n,unsafe_count,violation_rate
+train,39,24,0.6153846153846154
+validation,18,11,0.6111111111111112
+test,20,12,0.6

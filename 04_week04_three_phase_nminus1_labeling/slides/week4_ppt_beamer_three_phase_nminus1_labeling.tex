@@ -14,12 +14,12 @@
 \usepackage{fontspec}
 \usepackage{hyperref}
 
-\setmainfont{DejaVu Sans}
-\setsansfont{DejaVu Sans}
-\setmonofont{DejaVu Sans Mono}
-\setCJKmainfont{Noto Sans CJK SC}
-\setCJKsansfont{Noto Sans CJK SC}
-\setCJKmonofont{Noto Sans CJK SC}
+\setmainfont{texgyreheros-regular.otf}[BoldFont=texgyreheros-bold.otf,ItalicFont=texgyreheros-italic.otf]
+\setsansfont{texgyreheros-regular.otf}[BoldFont=texgyreheros-bold.otf,ItalicFont=texgyreheros-italic.otf]
+\setmonofont{lmmono10-regular.otf}[BoldFont=lmmonolt10-bold.otf]
+\setCJKmainfont{FandolHei-Regular.otf}
+\setCJKsansfont{FandolHei-Regular.otf}
+\setCJKmonofont{FandolFang-Regular.otf}
 
 \definecolor{myblue}{RGB}{36,88,135}
 \definecolor{mygreen}{RGB}{40,120,80}
@@ -29,6 +29,8 @@
 \setbeamercolor{title}{fg=myblue}
 \setbeamercolor{frametitle}{fg=myblue}
 \setbeamercolor{structure}{fg=myblue}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
 
 \lstset{
   basicstyle=\ttfamily\scriptsize,
@@ -67,10 +69,10 @@
 \end{enumerate}
 \end{frame}
 
-\begin{frame}{八周课程中的位置}
+\begin{frame}[shrink=4]{八周课程中的位置}
 \centering
-\begin{tikzpicture}[node distance=0.95cm, every node/.style={font=\scriptsize}]
-\tikzstyle{box}=[draw, rounded corners, minimum width=2.3cm, minimum height=0.72cm, align=center]
+\begin{tikzpicture}[node distance=0.55cm, every node/.style={font=\scriptsize}]
+\tikzstyle{box}=[draw, rounded corners, minimum width=2.0cm, minimum height=0.72cm, align=center]
 \node[box] (w1) {Week 1\\pandapower basics};
 \node[box, right=of w1] (w2) {Week 2\\3-phase PF};
 \node[box, right=of w2] (w3) {Week 3\\Scenario engine};
@@ -356,7 +358,8 @@ y_{V,high}&=\mathbb{I}\left(\max_{i,\phi}|V_{i,\phi}|>V^{max}\right)
 \begin{frame}{线路 loading / current 越限标签}
 \begin{block}{Per-phase loading}
 \[
-loading_{\ell,\phi}=100\frac{|I_{\ell,\phi}|}{I^{max}_{\ell}}
+I_{\ell,eff}^{max}=I_\ell^{max}df_\ell n_{\ell,parallel},\qquad
+loading_{\ell,\phi}=100\frac{|I_{\ell,\phi}|}{I^{max}_{\ell,eff}}
 \]
 \end{block}
 \[
@@ -379,7 +382,7 @@ V^{(2)}=\frac{1}{3}\left(V_a+a^2V_b+aV_c\right)
 \]
 \end{block}
 \begin{itemize}
-  \item Week 4 阈值：$\mathrm{VUF}^{max}=3\%$。
+  \item Week 4 教学阈值：$\mathrm{VUF}^{max}=2\%$，与 Week 2/6 保持一致。
   \item Notebook 可从 \texttt{vm\_a\_pu}, \texttt{va\_a\_degree} 等字段手算 VUF。
   \item 本周数据中 VUF 没有超过阈值，但保留标签用于后续 full feeder 实验。
 \end{itemize}
@@ -604,7 +607,7 @@ summary(x_t,\text{no outage})=summary_{base}(x_t)
 \end{column}
 \end{columns}
 \begin{exampleblock}{Notebook 输出}
-63 converged rows; 7 PCC outage rows all marked non-converged.
+35 rows run and converge; 35 service-loss rows are skipped before PF; 7 PCC-outage rows are marked no-slack/non-converged.
 \end{exampleblock}
 \end{frame}
 
@@ -757,7 +760,7 @@ labels & violation flags, \texttt{violation\_label}, \texttt{severity\_score} \\
 \begin{enumerate}
   \item 新增 \texttt{line\_4\_out} contingency，观察 PV-C lateral outage 是否产生 service-loss label。
   \item 把 $V^{min}$ 从 0.95 改成 0.97，观察 unsafe 样本数量如何变化。
-  \item 把 $VUF^{max}$ 从 3\% 改成 1\%，观察 VUF label 是否出现。
+  \item 把 $VUF^{max}$ 从 2\% 改成 1\%，观察 VUF label 是否出现。
   \item 新增 \texttt{single\_pv\_all\_trip} contingency，一次切除所有 PV，并解释这是否仍是 N-1。
   \item 设计一个更合理的 critical-load severity weighting。
 \end{enumerate}

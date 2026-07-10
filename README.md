@@ -12,6 +12,22 @@ This package contains the reviewed research design and the complete 8-week teach
 - Use `outputs/` folders for generated datasets, validation summaries, plots, and paper-ready tables.
 - Start with `00_overview/overall_review_report.md` and `00_overview/overall_review_validation_summary.csv`.
 
+## Reproducible environment
+
+Create the tested environment from the repository root, then register it as a
+Jupyter kernel:
+
+```bash
+micromamba create -f environment.yml -y
+micromamba run -n pdpower python -m ipykernel install --user \
+  --name pdpower --display-name "Python (pdpower)"
+```
+
+The release audit uses Python 3.11, pandapower 3.2.1, NumPy 1.26.4,
+pandas 2.2.3, SciPy 1.13.1, scikit-learn 1.8, and PyTorch 2.10. The Week 7
+notebook implements message passing in plain PyTorch and does not require
+PyTorch Geometric.
+
 ## Folder map
 
 ```text
@@ -32,7 +48,10 @@ This package contains the reviewed research design and the complete 8-week teach
 
 ## Validation status
 
-The final package audit passed **20/20** consolidated checks. The final executed notebooks were inspected for error outputs, weekly validation summaries were checked, dataset row counts were cross-checked, leakage guards were audited, and Beamer PDFs were verified for expected page counts.
+The release audit executes the clean notebooks from a fresh repository copy,
+checks clean/executed source parity, validates weekly artifacts and formulas,
+and recompiles the LaTeX sources. See the overview report for the current
+results instead of relying on old page counts or cached notebook outputs.
 
 ## Important interpretation note
 
